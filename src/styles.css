@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+@theme {
+  --color-midnight: #0b132b;
+  --color-crimson: #c8102e;
+  --color-linen: #f8faf8;
+}
+
+body { margin: 0; background: var(--color-linen); color: var(--color-midnight); font-family: Arial, sans-serif; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .65; }
