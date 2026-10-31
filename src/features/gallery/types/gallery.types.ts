@@ -106,3 +106,38 @@ export interface GalleryUploadResult {
   url: string;
   thumbnail_url: string;
 }
+
+export interface GalleryListPageProps {
+  onExpired: () => void;
+  onCreate?: () => void;
+  onEdit?: (id: string) => void;
+}
+export interface GalleryEditorPageProps {
+  caseID: string;
+  onExpired: () => void;
+  onNavigate: (view: 'gallery' | 'editor', options?: { replace?: boolean; id?: string; bypassBlock?: boolean }) => void;
+  registerBlocker: (blocker: (() => boolean) | null) => void;
+}
+export interface GalleryDetailPageProps {
+  caseID: string;
+  onExpired: () => void;
+  onEdit: (id: string) => void;
+  onBack: () => void;
+}
+
+export type GalleryFilterKey = 'status' | 'procedure_tag' | 'timeframe_badge';
+export type GalleryLocale = 'en' | 'ar';
+export type GalleryCaptionForm = { altText: string; caption: string; approved: boolean };
+export type GalleryEditorForm = {
+  signedConsentID: string; consentVerified: boolean; procedureTag: string; timeframeBadge: string;
+  beforePosition: '' | 'left' | 'right'; cropAttested: boolean; displayOrder: string;
+  captions: Record<GalleryLocale, GalleryCaptionForm>;
+};
+export type GalleryBusy = 'create' | 'save' | 'upload' | 'preview' | 'publish' | null;
+export interface GalleryThumbnailProps { item: GalleryCase }
+export interface GalleryCardProps { item: GalleryCase; options: GalleryOptions; search: string; onEdit?: (id: string) => void }
+export interface GalleryFieldErrorProps { name: string; errors: Record<string, string> }
+export interface GalleryParsedQuery { filters: GalleryFilters; invalid: boolean }
+
+
+export interface GalleryPreviewState { url: string; expires_at: string }

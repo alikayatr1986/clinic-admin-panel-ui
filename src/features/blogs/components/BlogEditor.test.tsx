@@ -1,10 +1,13 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { BlogDraftProvider } from '../context/BlogDraftContext';
+import type { ReactElement } from 'react';
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../lib/api';
 import { blogsApi } from '../services/blogs.service';
 import { BlogEditor } from './BlogEditor';
 import type { BlogDetail, BlogEdition, BlogLocale, BlogReviewKind } from '../types/blogs.types';
 
+function render(element: ReactElement) { return rtlRender(element, { wrapper: BlogDraftProvider }); }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); window.history.replaceState({}, '', '/admin/'); });
 beforeEach(() => { vi.spyOn(window, 'confirm').mockReturnValue(true); });
 const detail = { id: 'post-1', slug: 'draft-post', category_id: 'cat-1', category_key: 'ent-health', status: 'draft' as const, aggregate_revision: 2, first_published_at: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' };

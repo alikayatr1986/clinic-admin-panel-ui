@@ -1,21 +1,8 @@
+import type { GalleryPreviewState } from '../types/gallery.types';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError } from '../../../lib/api';
-import { galleryApi } from '../services/gallery.service';
-import type { GalleryCase, GalleryCaption, GalleryEdit, GalleryOptions } from '../types/gallery.types';
-
-type Locale = 'en' | 'ar';
-type CaptionForm = { altText: string; caption: string; approved: boolean };
-type EditorForm = {
-  signedConsentID: string;
-  consentVerified: boolean;
-  procedureTag: string;
-  timeframeBadge: string;
-  beforePosition: '' | 'left' | 'right';
-  cropAttested: boolean;
-  displayOrder: string;
-  captions: Record<Locale, CaptionForm>;
-};
-type Busy = 'create' | 'save' | 'upload' | 'preview' | 'publish' | null;
+import { useGalleryActions, useGalleryCase, useGalleryOptions } from '../hooks/useGallery';
+import type { GalleryCase, GalleryCaption, GalleryEdit, GalleryOptions, GalleryEditorPageProps, GalleryLocale as Locale, GalleryCaptionForm as CaptionForm, GalleryEditorForm as EditorForm, GalleryBusy as Busy, GalleryFieldErrorProps } from '../types/gallery.types';
 
 function formFromCase(item: GalleryCase): EditorForm {
   function caption(lang: Locale): CaptionForm {
@@ -74,29 +61,27 @@ function errorMessage(error: unknown): string {
   return 'The request could not be completed. Try again.';
 }
 
-function FieldError({ name, errors }: { name: string; errors: Record<string, string> }) {
+function FieldError({ name, errors }: GalleryFieldErrorProps) {
   return errors[name] ? <p className="mt-1 text-sm text-red-800">{errors[name]}</p> : null;
 }
 
-export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlocker }: {
-  caseID: string;
-  onExpired: () => void;
-  onNavigate: (view: 'gallery' | 'editor', options?: { replace?: boolean; id?: string; bypassBlock?: boolean }) => void;
-  registerBlocker: (blocker: (() => boolean) | null) => void;
-}) {
+export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlocker }: GalleryEditorPageProps) {
+  const optionsQuery = useGalleryOptions();
+  const caseQuery = useGalleryCase(caseID);
+  const actions = useGalleryActions();
   const [item, setItem] = useState<GalleryCase | null>(null);
   const [options, setOptions] = useState<GalleryOptions | null>(null);
   const [form, setForm] = useState<EditorForm | null>(null);
   const [loading, setLoading] = useState(caseID !== 'new');
   const [loadError, setLoadError] = useState('');
-  const [attempt, setAttempt] = useState(0);
+  
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState('');
   const [fields, setFields] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState('');
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
-  const [preview, setPreview] = useState<{ url: string; expires_at: string } | null>(null);
+  const [preview, setPreview] = useState<GalleryPreviewState | null>(null);
   const [imageBroken, setImageBroken] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -105,25 +90,20 @@ export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlock
   const clinicalDirty = Boolean(item?.published && form && isClinicalChange(form, formFromCase(item)));
 
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setLoadError('');
-    Promise.all([galleryApi.options(), caseID === 'new' ? Promise.resolve(null) : galleryApi.get(caseID)]).then(([choices, record]) => {
-      if (!active) return;
-      if (!Array.isArray(choices.data?.procedures) || !Array.isArray(choices.data?.timeframes)) throw new Error('Invalid options response');
-      setOptions(choices.data);
-      if (record) {
-        setItem(record.data);
-        setForm(formFromCase(record.data));
-      }
-      setLoading(false);
-    }).catch((failure: unknown) => {
-      if (!active) return;
+    if (optionsQuery.error || caseQuery.error) {
+      const failure = optionsQuery.error || caseQuery.error;
       if (failure instanceof ApiError && failure.status === 401) onExpired();
       else { setLoadError(errorMessage(failure)); setLoading(false); }
-    });
-    return () => { active = false; };
-  }, [caseID, attempt]);
+      return;
+    }
+    if (!optionsQuery.data || (caseID !== 'new' && !caseQuery.data)) return;
+    const choices = optionsQuery.data.data;
+    if (!Array.isArray(choices?.procedures) || !Array.isArray(choices?.timeframes)) { setLoadError('Invalid options response'); setLoading(false); return; }
+    setLoadError('');
+    setOptions(choices);
+    if (caseQuery.data && !item) { setItem(caseQuery.data.data); setForm(formFromCase(caseQuery.data.data)); }
+    setLoading(false);
+  }, [caseID, optionsQuery.data, optionsQuery.error, caseQuery.data, caseQuery.error]);
 
   useEffect(() => {
     const blocker = dirty || busy ? () => window.confirm('You have unsaved changes or an operation in progress. Leave this case?') : null;
@@ -147,7 +127,7 @@ export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlock
     if (busy) return;
     setBusy('create'); setError(''); setNotice('');
     try {
-      const response = await galleryApi.create();
+      const response = await actions.create.mutateAsync();
       onNavigate('editor', { id: response.data.id, replace: true, bypassBlock: true });
     } catch (failure) { handleFailure(failure); }
     finally { setBusy(null); }
@@ -186,7 +166,7 @@ export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlock
     if (clinicalDirty && !window.confirm('Saving clinical details or descriptions will unpublish this case and reset relevant approvals. Continue?')) return;
     setBusy('save'); setError(''); setFields({}); setNotice('');
     try {
-      const response = await galleryApi.edit(item.id, toEdit(form, item));
+      const response = await actions.edit.mutateAsync({ id: item.id, input: toEdit(form, item) });
       const returned = response.data;
       const approvalReset = (['en', 'ar'] as const).some((lang) => form.captions[lang].approved && returned.captions.find((caption) => caption.lang === lang)?.approval !== 'approved');
       setItem(returned); setForm(formFromCase(returned)); setPreview(null);
@@ -200,13 +180,13 @@ export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlock
     if (item.published && !window.confirm('Replacing this image will unpublish the case and reset reviews. Continue?')) return;
     setBusy('upload'); setError(''); setFields({}); setNotice(''); setProgress(0);
     try {
-      const response = await galleryApi.upload(item.id, pendingFile, item.revision, setProgress);
+      const response = await actions.upload.mutateAsync({ id: item.id, file: pendingFile, revision: item.revision, progress: setProgress });
       setItem((current) => current ? { ...current, ...response.data } : current);
       setPendingFile(null); if (fileInput.current) fileInput.current.value = '';
       setPreview(null); setProgress(100); setImageBroken(false);
       setNotice('Upload complete. Review the new image and save any pending form changes.');
       try {
-        const refreshed = await galleryApi.get(item.id);
+        const refreshed = await caseQuery.refetch().then((result) => { if (!result.data) throw result.error; return result.data; });
         setItem(refreshed.data);
         const hasUnsavedForm = form && JSON.stringify(form) !== JSON.stringify(formFromCase(item));
         if (!hasUnsavedForm) setForm(formFromCase(refreshed.data));
@@ -220,7 +200,7 @@ export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlock
     if (dirty) { setError('Save changes and upload the selected image before generating a preview.'); return; }
     setBusy('preview'); setError(''); setFields({}); setPreview(null);
     try {
-      const response = await galleryApi.preview(item.id, item.revision);
+      const response = await actions.preview.mutateAsync({ id: item.id, revision: item.revision });
       setPreview(response.data);
     } catch (failure) { handleFailure(failure); }
     finally { setBusy(null); }
@@ -231,7 +211,7 @@ export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlock
     if (dirty) { setError('Save changes and upload the selected image before changing publication.'); return; }
     setBusy('publish'); setError(''); setFields({}); setNotice('');
     try {
-      const response = await galleryApi.publish(item.id, item.revision, published);
+      const response = await actions.publish.mutateAsync({ id: item.id, revision: item.revision, published });
       setItem(response.data); setForm(formFromCase(response.data)); setPreview(null);
       setNotice(published ? 'Case published.' : 'Case unpublished.');
     } catch (failure) { handleFailure(failure); }
@@ -239,7 +219,7 @@ export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlock
   }
 
   if (loading) return <p role="status" className="mt-8">Loading case editor…</p>;
-  if (loadError) return <div className="mt-8 rounded-xl border border-red-200 bg-white p-6"><p role="alert">{loadError}</p><button type="button" onClick={() => setAttempt((value) => value + 1)} className="mt-4 rounded-md border border-slate-300 px-4 py-2">Retry</button></div>;
+  if (loadError) return <div className="mt-8 rounded-xl border border-red-200 bg-white p-6"><p role="alert">{loadError}</p><button type="button" onClick={() => { void optionsQuery.refetch(); void caseQuery.refetch(); }} className="mt-4 rounded-md border border-slate-300 px-4 py-2">Retry</button></div>;
   if (!options) return null;
   if (caseID === 'new') return <section className="mt-8 rounded-xl border border-slate-200 bg-white p-6"><h2 className="text-xl font-semibold">Create a draft case</h2><p className="mt-2 text-slate-600">A draft stays private until the clinic reviews and publishes it.</p>{error && <p role="alert" className="mt-4 text-red-800">{error}</p>}<button type="button" disabled={busy !== null} onClick={() => void createDraft()} className="mt-5 rounded-md bg-crimson px-4 py-2 font-semibold text-white">{busy ? 'Creating…' : 'Create draft'}</button></section>;
   if (!item || !form) return <p role="alert" className="mt-8">Case data is unavailable.</p>;

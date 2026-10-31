@@ -1,7 +1,7 @@
-import { Fragment, useEffect, useRef, useState, type MutableRefObject } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../../lib/api';
 import { blogsApi } from '../services/blogs.service';
-import type { BlogDetail, BlogHomeSettings, BlogLocale, BlogReviewKind } from '../types/blogs.types';
+import type { BlogPublishPanelProps, BlogReviewSelection, BlogHomeSettings, BlogLocale, BlogReviewKind } from '../types/blogs.types';
 
 const LOCALE_NAME: Record<BlogLocale, string> = { en: 'English', ar: 'Arabic' };
 // Known readiness keys in checklist order: [key, checklist label, short name used in sentences, editor field to jump to].
@@ -20,10 +20,10 @@ export function checklistItems(missing: string[]) {
   return [...known, ...extra];
 }
 
-export function BlogPublishPanel({ post, locked, lock, onBusy, onRefresh, onDeleted, onJump }: { post: BlogDetail; onJump?: (locale: BlogLocale, field: string) => void; locked: boolean; lock: MutableRefObject<boolean>; onBusy: (busy: boolean) => void; onRefresh: () => Promise<void>; onDeleted: () => void }) {
+export function BlogPublishPanel({ post, locked, lock, onBusy, onRefresh, onDeleted, onJump }: BlogPublishPanelProps) {
   const [home, setHome] = useState<BlogHomeSettings | null>(null); const [error, setError] = useState(''); const [notice, setNotice] = useState('');
   const [confirmation, setConfirmation] = useState<'unpublish' | 'delete' | null>(null); const [titleInput, setTitleInput] = useState('');
-  const [review, setReview] = useState<{ locale: BlogLocale; revisionID: string; categoryID: string } | null>(null); const [attested, setAttested] = useState(false); const [reference, setReference] = useState('');
+  const [review, setReview] = useState<BlogReviewSelection | null>(null); const [attested, setAttested] = useState(false); const [reference, setReference] = useState('');
   const [summary, setSummary] = useState(false); const confirmPublish = useRef<HTMLButtonElement>(null); const publishTrigger = useRef<HTMLButtonElement>(null);
   const mounted = useRef(true); const title = post.en?.title || post.ar?.title || post.slug;
   useEffect(() => { mounted.current = true; void loadHome(); return () => { mounted.current = false; }; }, []);

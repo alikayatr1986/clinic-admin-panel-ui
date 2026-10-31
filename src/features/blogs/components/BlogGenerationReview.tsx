@@ -1,16 +1,8 @@
+import type { BlogGenerationReviewProps } from '../types/blogs.types';
 import { useState } from 'react';
 import type { BlogGenerationJob, BlogLocale } from '../types/blogs.types';
 
-export interface BlogGenerationReviewProps {
-  job: BlogGenerationJob;
-  currentDraft: { title: string; excerpt: string; seoTitle: string; seoDescription: string };
-  locale: BlogLocale;
-  dirty: boolean;
-  applying: boolean;
-  discarding: boolean;
-  onApply: (selectedFields: string[]) => void | Promise<void>;
-  onDiscard: () => void | Promise<void>;
-}
+
 
 export function BlogGenerationReview({
   job,

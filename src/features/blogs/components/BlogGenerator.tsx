@@ -1,18 +1,11 @@
+import type { BlogGeneratorProps } from '../types/blogs.types';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError } from '../../../lib/api';
 import { blogsApi } from '../services/blogs.service';
 import type { BlogGenerationBrief, BlogGenerationJob, BlogGenerationSource, BlogLocale } from '../types/blogs.types';
 import { BlogGenerationReview } from './BlogGenerationReview';
 
-export interface BlogGeneratorProps {
-  postID: string;
-  locale: BlogLocale;
-  baseRevision: number;
-  dirty: boolean;
-  currentDraft: { title: string; excerpt: string; seoTitle: string; seoDescription: string };
-  onRefresh: (expectedRevision?: number) => Promise<void>;
-  onApplied?: (notice: string) => void;
-}
+
 
 const storageKey = (postID: string, locale: string) => `blog_gen_job_${postID}_${locale}`;
 

@@ -1,4 +1,8 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { NavigationBoundary } from '../../../app/navigation';
+import { adminRouteContracts } from '../../../app/route-contract';
+import type { ReactElement } from 'react';
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../lib/api';
@@ -6,9 +10,10 @@ import { authApi } from '../services/auth.service';
 import { queryClient } from '../../../lib/query-client';
 import { galleryApi } from '../../gallery/services/gallery.service';
 import { blogsApi } from '../../blogs/services/blogs.service';
-import { AdminApp } from './AdminApp';
+import { AdminApp } from '../../../app/AdminApp';
 import { leadsApi } from '../../leads/services/leads.service';
 
+function render(_element: ReactElement) { const router = createBrowserRouter([{ element: <NavigationBoundary />, children: [{ element: <AdminApp />, children: adminRouteContracts }] }], { basename: '/admin' }); return rtlRender(<RouterProvider router={router} />); }
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -28,11 +33,11 @@ describe('admin authentication shell', () => {
     vi.spyOn(blogsApi, 'options').mockResolvedValue({ data: { limits: {}, generation_enabled: false, categories: [{ id: 'cat-1', key: 'ent-health', name_en: 'ENT Health', name_ar: 'صحة' }] } });
     vi.spyOn(blogsApi, 'preview').mockResolvedValue({ data: { id: 'post-1', slug: 'post', lang: 'en', title: 'Saved preview title', excerpt: '', author_name: '', category: { key: 'ent-health', label: 'Health' }, body: { schema_version: 1, blocks: [] }, references: [], cover: null, first_published_at: '', last_published_at: '', reading_time_minutes: 1 } });
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false); const user = userEvent.setup(); render(<AdminApp />);
-    const region = await screen.findByRole('region', { name: 'Saved article preview' }); expect(region).toHaveFocus(); expect(window.location.pathname).toBe('/admin/blogs/post-1/preview');
+    const region = await screen.findByRole('region', { name: 'Saved article preview' }); await waitFor(() => expect(region).toHaveFocus()); expect(window.location.pathname).toBe('/admin/blogs/post-1/preview');
     const title = screen.getByLabelText('Title'); await user.clear(title); await user.type(title, 'Local EN text');
-    await user.click(screen.getByRole('button', { name: 'Return to editor' })); expect(window.location.pathname).toBe('/admin/blogs/post-1'); expect(screen.queryByRole('region', { name: 'Saved article preview' })).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Preview saved revision' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Return to editor' })); expect(window.location.pathname).toBe('/admin/blogs/post-1/edit'); expect(screen.queryByRole('region', { name: 'Saved article preview' })).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Preview saved revision' })).toHaveFocus();
     window.history.back(); await screen.findByRole('region', { name: 'Saved article preview' }); expect(title).toHaveValue('Local EN text'); expect(screen.getByLabelText('Title')).toBe(title);
-    window.history.forward(); await waitFor(() => expect(screen.queryByRole('region', { name: 'Saved article preview' })).not.toBeInTheDocument()); expect(window.location.pathname).toBe('/admin/blogs/post-1'); expect(title).toHaveValue('Local EN text');
+    window.history.forward(); await waitFor(() => expect(screen.queryByRole('region', { name: 'Saved article preview' })).not.toBeInTheDocument()); expect(window.location.pathname).toBe('/admin/blogs/post-1/edit'); expect(title).toHaveValue('Local EN text');
     await user.click(screen.getByRole('button', { name: 'Preview saved revision' })); expect(window.location.pathname).toBe('/admin/blogs/post-1/preview'); expect(screen.getByLabelText('Title')).toBe(title); expect(confirm).not.toHaveBeenCalled();
   });
   it('shows pending and retries a transient session failure', async () => {
@@ -142,7 +147,7 @@ describe('admin authentication shell', () => {
   });
 
   it('warns before leaving an editor with unsaved changes', async () => {
-    window.history.replaceState({}, '', '/admin/gallery/case-1');
+    window.history.replaceState({}, '', '/admin/gallery/case-1/edit');
     vi.spyOn(authApi, 'session').mockResolvedValue({ data: { username: 'staff', role: 'staff', expires_at: '2030-01-01T00:00:00Z' } });
     vi.spyOn(galleryApi, 'options').mockResolvedValue({ data: { procedures: [], timeframes: [] } });
     vi.spyOn(galleryApi, 'get').mockResolvedValue({ data: {
@@ -156,7 +161,7 @@ describe('admin authentication shell', () => {
     await user.type(await screen.findByLabelText('Signed consent reference'), 'signed-reference');
     await user.click(screen.getByRole('button', { name: 'Back to gallery' }));
     expect(confirm).toHaveBeenCalledOnce();
-    expect(window.location.pathname).toBe('/admin/gallery/case-1');
+    expect(window.location.pathname).toBe('/admin/gallery/case-1/edit');
     expect(screen.getByLabelText('Signed consent reference')).toHaveValue('signed-reference');
     confirm.mockReturnValue(true);
     await user.click(screen.getByRole('button', { name: 'Back to gallery' }));
@@ -164,15 +169,50 @@ describe('admin authentication shell', () => {
   });
 
   it('direct-loads a blog editor and preserves Blogs, Gallery, history, and logout routing', async () => {
-    window.history.replaceState({}, '', '/admin/blogs/post-1'); document.cookie = 'admin_csrf=test-token; Path=/';
+    window.history.replaceState({}, '', '/admin/blogs/post-1/edit'); document.cookie = 'admin_csrf=test-token; Path=/';
     vi.spyOn(authApi, 'session').mockResolvedValue({ data: { username: 'staff', role: 'staff', expires_at: '2030-01-01T00:00:00Z' } }); vi.spyOn(authApi, 'logout').mockResolvedValue({ data: { ok: true } });
     vi.spyOn(blogsApi, 'get').mockResolvedValue({ data: { id: 'post-1', slug: 'direct-post', category_id: 'cat-1', category_key: 'ent-health', status: 'draft', aggregate_revision: 1, first_published_at: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' } });
     vi.spyOn(blogsApi, 'options').mockResolvedValue({ data: { limits: {}, generation_enabled: false, categories: [{ id: 'cat-1', key: 'ent-health', name_en: 'ENT Health', name_ar: 'صحة' }] } }); vi.spyOn(blogsApi, 'list').mockResolvedValue({ data: [], page: 1, page_size: 12, total: 0 });
     vi.spyOn(galleryApi, 'options').mockResolvedValue({ data: { procedures: [], timeframes: [] } }); vi.spyOn(galleryApi, 'list').mockResolvedValue({ data: [], page: 1, page_size: 12, total: 0 });
-    const user = userEvent.setup(); render(<AdminApp />); expect(await screen.findByRole('heading', { name: 'Blog editor' })).toBeInTheDocument(); expect(window.location.pathname).toBe('/admin/blogs/post-1');
+    const user = userEvent.setup(); render(<AdminApp />); expect(await screen.findByRole('heading', { name: 'Blog editor' })).toBeInTheDocument(); expect(window.location.pathname).toBe('/admin/blogs/post-1/edit');
     await user.click(screen.getByRole('link', { name: 'Blogs' })); expect(await screen.findByText('No blog articles yet.')).toBeInTheDocument(); expect(window.location.pathname).toBe('/admin/blogs');
     await user.click(screen.getByRole('link', { name: 'Gallery' })); expect(await screen.findByText('No gallery cases match these filters.')).toBeInTheDocument(); expect(window.location.pathname).toBe('/admin/gallery');
     window.history.back(); window.dispatchEvent(new PopStateEvent('popstate')); await waitFor(() => expect(window.location.pathname).toBe('/admin/blogs')); expect(await screen.findByRole('heading', { name: 'Blogs' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Sign out' })); await waitFor(() => expect(window.location.pathname).toBe('/admin/login')); expect(screen.getByRole('heading', { name: 'Staff sign in' })).toBeInTheDocument();
+  });
+
+  it('direct-loads a saved blog detail page with metadata and edit action', async () => {
+    window.history.replaceState({}, '', '/admin/blogs/post-1');
+    vi.spyOn(authApi, 'session').mockResolvedValue({ data: { username: 'staff', role: 'staff', expires_at: '2030-01-01T00:00:00Z' } });
+    vi.spyOn(blogsApi, 'get').mockResolvedValue({ data: { id: 'post-1', slug: 'saved-post', category_id: 'cat-1', category_key: 'ent-health', status: 'draft', aggregate_revision: 1, first_published_at: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z', en: { id: 'en-1', language: 'en', edition_revision: 1, title: 'Saved Title', excerpt: 'Excerpt', author_name: 'Dr. Naserzadeh', body: { schema_version: 1, blocks: [] }, cover_media_id: null, cover_alt: '', reviewer_attribution: null, seo_title: '', seo_description: '', references: [], origin: 'manual', updated_at: '' } } });
+    vi.spyOn(blogsApi, 'options').mockResolvedValue({ data: { limits: {}, generation_enabled: false, categories: [{ id: 'cat-1', key: 'ent-health', name_en: 'ENT Health', name_ar: 'صحة' }] } });
+    const user = userEvent.setup();
+    render(<AdminApp />);
+    expect(await screen.findByRole('heading', { name: 'Article detail' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Saved Title' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit article' }));
+    expect(await screen.findByRole('heading', { name: 'Blog editor' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/admin/blogs/post-1/edit');
+  });
+
+  it('navigates from blog list with search params to create page and returns preserving search params', async () => {
+    window.history.replaceState({}, '', '/admin/blogs?status=draft&page=2');
+    vi.spyOn(authApi, 'session').mockResolvedValue({ data: { username: 'staff', role: 'staff', expires_at: '2030-01-01' } });
+    vi.spyOn(blogsApi, 'options').mockResolvedValue({ data: { limits: {}, generation_enabled: false, categories: [{ id: 'cat-1', key: 'ent-health', name_en: 'ENT Health', name_ar: 'صحة' }] } });
+    vi.spyOn(blogsApi, 'list').mockResolvedValue({ data: [], page: 2, page_size: 12, total: 15 });
+
+    render(<AdminApp />);
+    expect(await screen.findByRole('heading', { name: 'Articles' })).toBeInTheDocument();
+
+    // Click Create article button
+    fireEvent.click(screen.getByRole('button', { name: 'Create article' }));
+    expect(await screen.findByRole('heading', { name: 'New article draft' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/admin/blogs/new');
+
+    // Click ← Back to blog library
+    fireEvent.click(screen.getByRole('button', { name: '← Back to blog library' }));
+    expect(await screen.findByRole('heading', { name: 'Articles' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/admin/blogs');
+    expect(window.location.search).toBe('?status=draft&page=2');
   });
 });

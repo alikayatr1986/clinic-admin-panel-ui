@@ -7,15 +7,15 @@ import type {
 const casePath = (id: string) => `/admin/api/gallery/${encodeURIComponent(id)}` as const;
 
 export const galleryApi = {
-  list(filters: GalleryFilters = {}) {
+  list(filters: GalleryFilters = {}, signal?: AbortSignal) {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(filters)) {
       if (value !== undefined && value !== '') query.set(key, String(value));
     }
     const suffix = query.size ? `?${query}` : '';
-    return adminRequest<GalleryList>(`/admin/api/gallery${suffix}`);
+    return adminRequest<GalleryList>(`/admin/api/gallery${suffix}`, { signal });
   },
-  get(id: string) { return adminRequest<{ data: GalleryCase }>(casePath(id)); },
+  get(id: string, signal?: AbortSignal) { return adminRequest<{ data: GalleryCase }>(casePath(id), { signal }); },
   create(displayOrder = 0) {
     return adminRequest<{ data: GalleryCase }>('/admin/api/gallery', {
       method: 'POST', body: JSON.stringify({ display_order: displayOrder }),
@@ -34,7 +34,7 @@ export const galleryApi = {
       method: 'POST', body: JSON.stringify({ expected_revision: expectedRevision, published }),
     });
   },
-  options() { return adminRequest<{ data: GalleryOptions }>('/admin/api/gallery-options'); },
+  options(signal?: AbortSignal) { return adminRequest<{ data: GalleryOptions }>('/admin/api/gallery-options', { signal }); },
   content(lang: 'en' | 'ar') {
     return adminRequest<{ data: GalleryContent[] }>(`/admin/api/gallery-content?lang=${lang}`);
   },

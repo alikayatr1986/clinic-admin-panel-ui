@@ -90,3 +90,10 @@ export function adminUpload<T>(path: `/admin/api/${string}`, body: FormData, onP
   });
 }
 
+export function describeError(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 403) return 'Access denied. Your account may lack permission or your security token has expired.';
+    return error.message;
+  }
+  return 'Something went wrong. Try again.';
+}

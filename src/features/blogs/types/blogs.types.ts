@@ -1,3 +1,4 @@
+import type { MutableRefObject, ReactNode } from 'react';
 export type BlogLocale = 'en' | 'ar';
 export type BlogStatus = 'draft' | 'published' | 'published_with_changes';
 export type BlogStatusFilter = BlogStatus | 'needs_action';
@@ -49,3 +50,127 @@ export interface BlogGenerationJob {
   brief?: BlogGenerationBrief; result?: BlogGeneratedDraft; source_ids: string[];
   created_at: string; updated_at: string; provider?: string; model?: string; error_category?: string;
 }
+
+export interface BlogCreateData {
+  categoryID: string;
+  slug: string;
+  title: string;
+}
+
+export interface BlogCreateFormProps {
+  options: BlogOptions | null;
+  creating: boolean;
+  createError: string;
+  onSubmit: (data: BlogCreateData) => Promise<void>;
+  onCancel?: () => void;
+}
+
+export interface BlogCreatePageProps {
+  onExpired: () => void;
+  onCreated: (id: string) => void;
+  onCancel: () => void;
+}
+
+export interface BlogListPageProps {
+  onExpired: () => void;
+  onEdit: (id: string) => void;
+  onCreate: () => void;
+}
+
+export interface BlogListProps {
+  onExpired: () => void;
+  onEdit: (id: string) => void;
+  createOpen?: boolean;
+  embeddedCreate?: boolean;
+}
+
+export interface BlogDraftFormState {
+  slug: string;
+  categoryID: string;
+  title: string;
+  excerpt: string;
+  author: string;
+  reviewer: string;
+  coverMediaID: string | null;
+  coverAlt: string;
+  seoTitle: string;
+  seoDescription: string;
+  blocks: BlogBodyBlock[];
+  references: BlogReference[];
+}
+
+export interface BlogDraftRecord {
+  forms: Record<BlogLocale, BlogDraftFormState>;
+  saved: Record<BlogLocale, BlogDraftFormState>;
+  locale: BlogLocale;
+  file: File | null;
+  rights: string;
+  focalX: number;
+  focalY: number;
+  dirty: boolean;
+}
+
+export interface BlogDetailPageProps {
+  postID: string;
+  role?: 'admin' | 'staff';
+  onExpired: () => void;
+  onEdit: (id: string) => void;
+  onPreview: (id: string) => void;
+  onBack: () => void;
+  onDeleted?: () => void;
+}
+
+export interface BlogEditPageProps {
+  postID: string;
+  role?: 'admin' | 'staff';
+  onExpired: () => void;
+  onNavigate: () => void;
+  onPreview: (id: string) => void;
+  onDetail?: (id: string) => void;
+  onDeleted?: () => void;
+  registerBlocker: (blocker: (() => boolean) | null) => void;
+}
+
+export interface BlogPreviewPageProps {
+  postID: string;
+  onExpired: () => void;
+  onClose: () => void;
+}
+
+
+
+export interface BlogGeneratorProps {
+  postID: string;
+  locale: BlogLocale;
+  baseRevision: number;
+  dirty: boolean;
+  currentDraft: { title: string; excerpt: string; seoTitle: string; seoDescription: string };
+  onRefresh: (expectedRevision?: number) => Promise<void>;
+  onApplied?: (notice: string) => void;
+}
+
+export interface BlogGenerationReviewProps {
+  job: BlogGenerationJob;
+  currentDraft: { title: string; excerpt: string; seoTitle: string; seoDescription: string };
+  locale: BlogLocale;
+  dirty: boolean;
+  applying: boolean;
+  discarding: boolean;
+  onApply: (selectedFields: string[]) => void | Promise<void>;
+  onDiscard: () => void | Promise<void>;
+}
+
+export interface BlogDraftContextValue {
+  getDraft: (postID: string) => BlogDraftRecord | undefined;
+  saveDraft: (postID: string, draft: BlogDraftRecord) => void;
+  clearDraft: (postID: string) => void;
+  isDirty: (postID: string) => boolean;
+}
+
+export interface BlogDraftProviderProps { children: ReactNode }
+export interface BlogBodyProps { body: BlogBody }
+export interface BlogPreviewProps { postID: string; locale: BlogLocale; revision?: number; dirty: boolean; onClose: () => void }
+export interface BlogEditorProps { postID: string; role?: 'admin' | 'staff'; onExpired: () => void; onNavigate: () => void; onDeleted?: () => void; registerBlocker: (blocker: (() => boolean) | null) => void }
+export interface BlogRequiredProps { children: string }
+export interface BlogPublishPanelProps { post: BlogDetail; onJump?: (locale: BlogLocale, field: string) => void; locked: boolean; lock: MutableRefObject<boolean>; onBusy: (busy: boolean) => void; onRefresh: () => Promise<void>; onDeleted: () => void }
+export interface BlogReviewSelection { locale: BlogLocale; revisionID: string; categoryID: string }

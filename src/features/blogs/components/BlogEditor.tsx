@@ -1,38 +1,36 @@
-import { useAdminNavigation } from '../../../app/navigation';
+import { useAdminNavigation } from '../../../lib/admin-navigation';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ApiError } from '../../../lib/api';
 import { blogsApi } from '../services/blogs.service';
-import type { BlogBodyBlock, BlogDetail, BlogEdition, BlogLocale, BlogOptions, BlogReference, BlogSaveInput } from '../types/blogs.types';
-import { BlogPreview } from './BlogPreview';
+import type { BlogEditorProps, BlogRequiredProps, BlogBodyBlock, BlogDraftFormState as FormState, BlogDetail, BlogEdition, BlogLocale, BlogOptions, BlogSaveInput } from '../types/blogs.types';
+import { useBlogDraft } from '../context/BlogDraftContext';
+import { BlogBody, BlogPreview } from './BlogPreview';
 import { BlogPublishPanel } from './BlogPublishPanel';
 import { BlogGenerator } from './BlogGenerator';
 
-interface FormState { slug: string; categoryID: string; title: string; excerpt: string; author: string; reviewer: string; coverMediaID: string | null; coverAlt: string; seoTitle: string; seoDescription: string; blocks: BlogBodyBlock[]; references: BlogReference[] }
+
 const empty = (post: BlogDetail): FormState => ({ slug: post.slug, categoryID: post.category_id, title: '', excerpt: '', author: '', reviewer: '', coverMediaID: null, coverAlt: '', seoTitle: '', seoDescription: '', blocks: [], references: [] });
 function fromEdition(post: BlogDetail, edition?: BlogEdition): FormState { return edition ? { slug: post.slug, categoryID: post.category_id, title: edition.title, excerpt: edition.excerpt, author: edition.author_name, reviewer: edition.reviewer_attribution ?? '', coverMediaID: edition.cover_media_id, coverAlt: edition.cover_alt, seoTitle: edition.seo_title, seoDescription: edition.seo_description, blocks: edition.body.blocks, references: edition.references } : empty(post); }
 const LOCALES = ['en', 'ar'] as const;
 const LOCALE_NAME: Record<BlogLocale, string> = { en: 'English', ar: 'Arabic' };
-function Req({ children }: { children: string }) { return <span className="after:ml-1 after:text-crimson after:content-['*']">{children}</span>; }
+function Req({ children }: BlogRequiredProps) { return <span className="after:ml-1 after:text-crimson after:content-['*']">{children}</span>; }
 function failureMessage(error: unknown, onExpired: () => void) { if (error instanceof ApiError) { if (error.status === 409) return 'This draft changed elsewhere. Copy your work, or reload the latest revision and deliberately reapply it.'; if (error.status === 401) { onExpired(); return 'Your session expired. Your text remains in this tab; sign in again to retry or copy it.'; } return error.message; } return 'The request failed. Your entered values are still available.'; }
 
-export function BlogEditor({ postID, role = 'staff', onExpired, onNavigate, onDeleted = onNavigate, registerBlocker }: { postID: string; role?: 'admin' | 'staff'; onExpired: () => void; onNavigate: () => void; onDeleted?: () => void; registerBlocker: (blocker: (() => boolean) | null) => void }) {
+export function BlogEditor({ postID, role = 'staff', onExpired, onNavigate, onDeleted = onNavigate, registerBlocker }: BlogEditorProps) {
   const routerNavigation = useAdminNavigation();
+  const { draft, saveForPost, clearForPost } = useBlogDraft(postID);
+  const initialDraft = useRef(draft);
   const [post, setPost] = useState<BlogDetail | null>(null); const [options, setOptions] = useState<BlogOptions | null>(null);
   const [locale, setLocale] = useState<BlogLocale>('en'); const [forms, setForms] = useState<Record<BlogLocale, FormState> | null>(null); const [saved, setSaved] = useState<Record<BlogLocale, FormState> | null>(null);
   const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [notice, setNotice] = useState(''); const [fields, setFields] = useState<Record<string, string>>({}); const [busy, setBusy] = useState<null | 'save' | 'upload' | 'lifecycle' | 'refresh'>(null); const [attempt, setAttempt] = useState(0);
   const refreshVersion = useRef(0); const previewTrigger = useRef<HTMLButtonElement>(null); const wasPreview = useRef(false);
-  const operationLock = useRef(false); const [fresh, setFresh] = useState(true); const [preview, setPreview] = useState(/\/preview\/?$/.test(window.location.pathname));
+  const operationLock = useRef(false); const [fresh, setFresh] = useState(true); const [localPreview, setLocalPreview] = useState(false); const preview = routerNavigation ? routerNavigation.routeId === 'blog-preview' : localPreview;
   const [file, setFile] = useState<File | null>(null); const [rights, setRights] = useState(''); const [focalX, setFocalX] = useState(.5); const [focalY, setFocalY] = useState(.5); const [progress, setProgress] = useState(0); const fileRef = useRef<HTMLInputElement>(null);
   const dirty = useMemo(() => Boolean(forms && saved && JSON.stringify(forms) !== JSON.stringify(saved)) || Boolean(file), [forms, saved, file]);
-  useEffect(() => { let active = true; const version = ++refreshVersion.current; setLoading(true); Promise.all([blogsApi.get(postID), blogsApi.options()]).then(([detail, opts]) => { if (!active || version !== refreshVersion.current) return; const p = detail.data; const value = { en: fromEdition(p, p.en), ar: fromEdition(p, p.ar) }; setPost(p); setForms(value); setSaved(structuredClone(value)); setOptions(opts.data); setFresh(true); setError(''); setLoading(false); }).catch((failure) => { if (!active) return; setError(failureMessage(failure, onExpired)); setLoading(false); }); return () => { active = false; ++refreshVersion.current; }; }, [postID, attempt]);
-  useEffect(() => {
-    if (routerNavigation) { setPreview(/\/preview\/?$/.test(routerNavigation.pathname)); return; }
-    const syncPreview = () => { const path = window.location.pathname.replace(/\/$/, ''); if (path === `/admin/blogs/${postID}` || path === `/admin/blogs/${postID}/preview`) setPreview(path.endsWith('/preview')); };
-    if (/\/admin\/blogs\/[^/]+(?:\/preview)?\/$/.test(window.location.pathname)) window.history.replaceState({}, '', window.location.pathname.replace(/\/$/, '') + window.location.search);
-    syncPreview(); window.addEventListener('popstate', syncPreview); return () => window.removeEventListener('popstate', syncPreview);
-  }, [postID, routerNavigation?.pathname]);
+  useEffect(() => { let active = true; const version = ++refreshVersion.current; setLoading(true); Promise.all([blogsApi.get(postID), blogsApi.options()]).then(([detail, opts]) => { if (!active || version !== refreshVersion.current) return; const p = detail.data; const value = { en: fromEdition(p, p.en), ar: fromEdition(p, p.ar) }; setPost(p); const stored = initialDraft.current; setForms(stored?.forms ?? value); setSaved(stored?.saved ?? structuredClone(value)); if (stored) { setLocale(stored.locale); setFile(stored.file); setRights(stored.rights); setFocalX(stored.focalX); setFocalY(stored.focalY); } setOptions(opts.data); setFresh(true); setError(''); setLoading(false); }).catch((failure) => { if (!active) return; setError(failureMessage(failure, onExpired)); setLoading(false); }); return () => { active = false; ++refreshVersion.current; }; }, [postID, attempt]);
+  useEffect(() => { if (forms && saved) saveForPost(postID, { forms, saved, locale, file, rights, focalX, focalY, dirty }); }, [postID, forms, saved, locale, file, rights, focalX, focalY, dirty, saveForPost]);
   useEffect(() => { if (!preview && wasPreview.current) previewTrigger.current?.focus(); wasPreview.current = preview; }, [preview]);
-  useEffect(() => { const block = () => !dirty || window.confirm('You have unsaved blog changes. Leave and discard them?'); registerBlocker(block); const unload = (event: BeforeUnloadEvent) => { if (!dirty) return; event.preventDefault(); event.returnValue = ''; }; window.addEventListener('beforeunload', unload); return () => { registerBlocker(null); window.removeEventListener('beforeunload', unload); }; }, [dirty, registerBlocker]);
+  useEffect(() => { const block = () => { const allowed = !dirty || window.confirm('You have unsaved blog changes. Leave and discard them?'); if (allowed) clearForPost(postID); return allowed; }; registerBlocker(block); const unload = (event: BeforeUnloadEvent) => { if (!dirty) return; event.preventDefault(); event.returnValue = ''; }; window.addEventListener('beforeunload', unload); return () => { registerBlocker(null); window.removeEventListener('beforeunload', unload); }; }, [dirty, registerBlocker]);
   if (loading) return <p role="status" className="mt-8">Loading blog editor…</p>;
   if (!post || !forms || !saved || !options) return <div className="mt-8"><p role="alert">{error || 'Article data is unavailable.'}</p><button onClick={() => setAttempt((v) => v + 1)} className="mt-3 rounded-md border px-4 py-2">Retry</button></div>;
   const currentPost = post;
@@ -45,9 +43,8 @@ export function BlogEditor({ postID, role = 'staff', onExpired, onNavigate, onDe
   function setBlock(index: number, patch: Partial<BlogBodyBlock>) { const clean = patch.marks ? { ...patch, marks: patch.marks.map((mark) => mark.type === 'link' ? mark : { type: mark.type, start: mark.start, end: mark.end }) } : patch; update('blocks', form.blocks.map((block, i) => i === index ? { ...block, ...clean } : block)); }
   function addBlock(type: BlogBodyBlock['type']) { const block: BlogBodyBlock = type === 'heading' ? { type, level: 2, text: '' } : type === 'list' ? { type, style: 'unordered', items: [''] } : { type, text: '' }; update('blocks', [...form.blocks, block]); }
   function changePreview(open: boolean) {
-    if (routerNavigation) routerNavigation.navigate(`/admin/blogs/${encodeURIComponent(postID)}${open ? '/preview' : ''}`);
-    else { window.history.pushState({}, '', `/admin/blogs/${postID}${open ? '/preview' : ''}`); window.dispatchEvent(new PopStateEvent('popstate')); }
-    setPreview(open);
+    const target = `/admin/blogs/${encodeURIComponent(postID)}${open ? '/preview' : '/edit'}${routerNavigation?.search ?? ''}`;
+    if (routerNavigation) routerNavigation.navigate(target); else setLocalPreview(open);
   }
   async function retrySavedDetails() {
     if (operationLock.current) return; operationLock.current = true; setBusy('refresh'); setError('');
@@ -112,7 +109,7 @@ export function BlogEditor({ postID, role = 'staff', onExpired, onNavigate, onDe
   const badge = (lang: BlogLocale) => { const missing = currentPost.readiness?.[lang]?.missing_fields; if (!missing) return ''; if (missing.includes('saved_revision')) return 'Not started'; return missing.length ? `${missing.length} missing` : 'Complete'; };
   return <div className="mt-8 space-y-6"><header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4"><div><h1 className="text-lg font-semibold">{forms.en.title || forms.ar.title || post.slug}</h1><p className="text-sm text-slate-600">{post.status.replaceAll('_', ' ')} · Revision {post.aggregate_revision}</p></div><div className="flex flex-wrap items-center gap-3">{dirty ? <p role="status" className="text-amber-900">Unsaved changes</p> : <p role="status" className="text-slate-600">All changes saved</p>}<button ref={previewTrigger} type="button" disabled={!fresh || Boolean(busy)} onClick={() => changePreview(true)} className="min-h-12 rounded border px-4">Preview saved revision</button><button type="submit" form="blog-editor-form" disabled={!fresh || Boolean(busy)} className="min-h-12 rounded-md bg-crimson px-5 font-semibold text-white">{busy === 'save' ? 'Saving…' : 'Save'}</button><button onClick={onNavigate} className="min-h-12 rounded-md border border-slate-300 px-4">Back to Blogs</button></div></header>
     {!fresh && <div role="alert"><p>Saved details need refreshing. Local EN/AR text is preserved. Compare the saved preview before saving again.</p><button disabled={Boolean(busy)} onClick={() => void retrySavedDetails()} className="min-h-12 underline">Retry saved details</button></div>}
-    {preview && fresh && <BlogPreview postID={post.id} locale={locale} revision={post[locale]?.edition_revision} dirty={dirty} onClose={() => changePreview(false)} />}
+    {preview && fresh && <><BlogPreview postID={post.id} locale={locale} revision={post[locale]?.edition_revision} dirty={dirty} onClose={() => changePreview(false)} />{dirty && <section aria-label="Unsaved article preview" className="rounded-xl border bg-white p-4"><p>Unsaved {locale.toUpperCase()} draft · Non-public</p><article lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'}><h2>{form.title}</h2><p>{form.excerpt}</p><p>{form.author}</p><BlogBody body={{ schema_version: 1, blocks: form.blocks }} /></article></section>}</>}
     {role === 'admin' && fresh && <BlogPublishPanel post={post} locked={Boolean(busy)} lock={operationLock} onBusy={(value) => setBusy(value ? 'lifecycle' : null)} onRefresh={refresh} onDeleted={onDeleted} onJump={jumpToField} />}
     {!options.generation_enabled ? (
       <section aria-label="AI drafting" className="rounded-xl border border-slate-200 bg-white p-6">

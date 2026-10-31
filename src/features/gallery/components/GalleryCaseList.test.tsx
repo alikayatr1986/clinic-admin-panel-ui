@@ -1,10 +1,20 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { NavigationBoundary } from '../../../app/navigation';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, fireEvent, render as testingRender, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../lib/api';
 import { galleryApi } from '../services/gallery.service';
 import type { GalleryCase, GalleryOptions } from '../types/gallery.types';
 import { GalleryCaseList } from './GalleryCaseList';
+
+function render(element: React.ReactElement) {
+  if (!window.location.pathname.startsWith('/admin')) window.history.replaceState({}, '', '/admin/gallery');
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const router = createBrowserRouter([{ element: <NavigationBoundary />, children: [{ path: '*', element }] }], { basename: '/admin' });
+  return testingRender(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>);
+}
 
 const options: GalleryOptions = {
   procedures: [{ code: 'synthetic-procedure', en: 'Synthetic procedure', ar: 'إجراء تجريبي' }],
@@ -35,6 +45,19 @@ function setupList(total = 1) {
 }
 
 describe('staff gallery case browser', () => {
+  it('preserves active filters in the case link for modified clicks', async () => {
+    window.history.replaceState({}, '', '/admin/gallery?status=published&procedure_tag=synthetic-procedure&page=2');
+    setupList(24);
+    const onEdit = vi.fn();
+    render(<GalleryCaseList onExpired={vi.fn()} onEdit={onEdit} />);
+    const link = await screen.findByRole('link', { name: 'View case' });
+    const target = new URL(link.getAttribute('href')!, window.location.origin);
+    expect(target.pathname).toBe('/admin/gallery/case-1');
+    expect(target.searchParams.get('returnTo')).toBe('/admin/gallery?status=published&procedure_tag=synthetic-procedure&page=2');
+    fireEvent.click(link, { ctrlKey: true, button: 0 });
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+
   it('renders the intact combined thumbnail, physical labels, review fields and server order', async () => {
     setupList();
     render(<GalleryCaseList onExpired={vi.fn()} />);
@@ -57,12 +80,12 @@ describe('staff gallery case browser', () => {
     const user = userEvent.setup();
     render(<GalleryCaseList onExpired={vi.fn()} />);
     await screen.findByRole('heading', { name: 'Case case-1' });
-    expect(list).toHaveBeenCalledWith({ page: 2, page_size: 12 });
+    expect(list).toHaveBeenCalledWith({ page: 2, page_size: 12 }, expect.any(AbortSignal));
     await user.click(screen.getByRole('button', { name: 'Next' }));
     await waitFor(() => expect(window.location.search).toBe('?page=3'));
     await user.selectOptions(screen.getByLabelText('Procedure'), 'synthetic-procedure');
     await waitFor(() => expect(window.location.search).toBe('?procedure_tag=synthetic-procedure'));
-    await waitFor(() => expect(list).toHaveBeenLastCalledWith({ page: 1, page_size: 12, procedure_tag: 'synthetic-procedure' }));
+    await waitFor(() => expect(list).toHaveBeenLastCalledWith({ page: 1, page_size: 12, procedure_tag: 'synthetic-procedure' }, expect.any(AbortSignal)));
     await user.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(window.location.search).toBe('');
   });
@@ -74,7 +97,7 @@ describe('staff gallery case browser', () => {
     await screen.findByRole('heading', { name: 'Case case-1' });
     expect(screen.getByLabelText('Status')).toHaveValue('published');
     expect(screen.getByLabelText('Timeframe')).toHaveValue('synthetic-time');
-    expect(list).toHaveBeenCalledWith({ page: 2, page_size: 12, status: 'published', timeframe_badge: 'synthetic-time' });
+    expect(list).toHaveBeenCalledWith({ page: 2, page_size: 12, status: 'published', timeframe_badge: 'synthetic-time' }, expect.any(AbortSignal));
   });
 
   it('shows a reset state for invalid filter codes without sending a list request', async () => {

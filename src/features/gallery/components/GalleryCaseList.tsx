@@ -1,14 +1,13 @@
-import { useAdminNavigation } from '../../../app/navigation';
+import { useAdminNavigation } from '../../../lib/admin-navigation';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../../../lib/api';
-import { galleryApi } from '../services/gallery.service';
-import type { GalleryCase, GalleryFilters, GalleryOption, GalleryOptions } from '../types/gallery.types';
+import { useGalleryList, useGalleryOptions } from '../hooks/useGallery';
+import type { GalleryCase, GalleryFilters, GalleryOption, GalleryOptions, GalleryFilterKey as FilterKey, GalleryThumbnailProps, GalleryCardProps, GalleryParsedQuery, GalleryListPageProps } from '../types/gallery.types';
 
 const PAGE_SIZE = 12;
 const allowedKeys = new Set(['page', 'status', 'procedure_tag', 'timeframe_badge']);
-type FilterKey = 'status' | 'procedure_tag' | 'timeframe_badge';
 
-function parseQuery(search: string, options: GalleryOptions): { filters: GalleryFilters; invalid: boolean } {
+function parseQuery(search: string, options: GalleryOptions): GalleryParsedQuery {
   const query = new URLSearchParams(search);
   let invalid = false;
   for (const [key] of query) {
@@ -49,7 +48,7 @@ function requestError(error: unknown): string {
   return 'Gallery cases are unavailable. Try again.';
 }
 
-function CaseThumbnail({ item }: { item: GalleryCase }) {
+function CaseThumbnail({ item }: GalleryThumbnailProps) {
   const [broken, setBroken] = useState(false);
   useEffect(() => setBroken(false), [item.thumbnail_url]);
   const enAlt = item.captions.find((caption) => caption.lang === 'en')?.alt_text;
@@ -69,7 +68,7 @@ function CaseThumbnail({ item }: { item: GalleryCase }) {
   );
 }
 
-function CaseCard({ item, options, onEdit }: { item: GalleryCase; options: GalleryOptions; onEdit?: (id: string) => void }) {
+function CaseCard({ item, options, search, onEdit }: GalleryCardProps) {
   const enReview = item.captions.find((caption) => caption.lang === 'en')?.approval ?? 'missing';
   const arReview = item.captions.find((caption) => caption.lang === 'ar')?.approval ?? 'missing';
   const updated = new Date(item.updated_at);
@@ -90,76 +89,31 @@ function CaseCard({ item, options, onEdit }: { item: GalleryCase; options: Galle
           <div><dt className="font-medium text-slate-500">Visual review</dt><dd>{item.crop_attested ? 'Attested' : 'Pending'}</dd></div>
         </dl>
         {!item.before_position && item.media_ready && <p className="mt-3 text-sm text-amber-800">Before/after side order not set.</p>}
-        {onEdit && <button type="button" onClick={() => onEdit(item.id)} className="mt-4 rounded-md border border-slate-300 px-4 py-2 font-medium hover:bg-slate-50">Edit case</button>}
+        {onEdit && <a href={`/admin/gallery/${encodeURIComponent(item.id)}?returnTo=${encodeURIComponent('/admin/gallery' + search)}`} onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onEdit(item.id); } }} className="mt-4 inline-block rounded-md border border-slate-300 px-4 py-2 font-medium hover:bg-slate-50">View case</a>}
       </div>
     </li>
   );
 }
 
-export function GalleryCaseList({ onExpired, onCreate, onEdit }: { onExpired: () => void; onCreate?: () => void; onEdit?: (id: string) => void }) {
+export function GalleryCaseList({ onExpired, onCreate, onEdit }: GalleryListPageProps) {
   const routerNavigation = useAdminNavigation();
-  const [search, setSearch] = useState(window.location.search);
-  const [options, setOptions] = useState<GalleryOptions | null>(null);
-  const [optionsError, setOptionsError] = useState('');
-  const [optionsAttempt, setOptionsAttempt] = useState(0);
-  const [result, setResult] = useState<{ forSearch: string; rows: GalleryCase[]; total: number; loading: boolean; error: string }>({ forSearch: search, rows: [], total: 0, loading: true, error: '' });
-  const [listAttempt, setListAttempt] = useState(0);
-
-  useEffect(() => {
-    if (routerNavigation) { setSearch(routerNavigation.search); return; }
-    const onPopState = () => setSearch(window.location.search);
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, [routerNavigation?.search]);
-
-  useEffect(() => {
-    let active = true;
-    setOptionsError('');
-    galleryApi.options().then(({ data }) => {
-      if (!active) return;
-      if (!Array.isArray(data?.procedures) || !Array.isArray(data?.timeframes)) {
-        setOptionsError('The server sent unexpected gallery filters.');
-        return;
-      }
-      setOptions(data);
-    }).catch((error: unknown) => {
-      if (!active) return;
-      if (error instanceof ApiError && error.status === 401) onExpired();
-      else setOptionsError(requestError(error));
-    });
-    return () => { active = false; };
-  }, [optionsAttempt]);
-
-  const parsed = options ? parseQuery(search, options) : null;
+  const [search, setSearch] = useState(routerNavigation?.search ?? '');
+  const optionsQuery = useGalleryOptions();
+  const options = optionsQuery.data?.data ?? null;
+  const optionsError = optionsQuery.error ? requestError(optionsQuery.error) : options && (!Array.isArray(options.procedures) || !Array.isArray(options.timeframes)) ? 'The server sent unexpected gallery filters.' : '';
+  const parsed = options && !optionsError ? parseQuery(search, options) : null;
   const invalid = parsed?.invalid ?? false;
   const page = parsed?.filters.page ?? 1;
-
-  useEffect(() => {
-    if (!options || !parsed || parsed.invalid) {
-      setResult({ forSearch: search, rows: [], total: 0, loading: false, error: '' });
-      return;
-    }
-    let active = true;
-    setResult({ forSearch: search, rows: [], total: 0, loading: true, error: '' });
-    galleryApi.list(parsed.filters).then((response) => {
-      if (!active) return;
-      if (!Array.isArray(response.data) || !Number.isSafeInteger(response.total) || response.total < 0) {
-        setResult({ forSearch: search, rows: [], total: 0, loading: false, error: 'The server sent an unexpected gallery response.' });
-        return;
-      }
-      setResult({ forSearch: search, rows: response.data, total: response.total, loading: false, error: '' });
-    }).catch((error: unknown) => {
-      if (!active) return;
-      if (error instanceof ApiError && error.status === 401) onExpired();
-      else setResult({ forSearch: search, rows: [], total: 0, loading: false, error: requestError(error) });
-    });
-    return () => { active = false; };
-  }, [search, options, listAttempt]);
+  const listQuery = useGalleryList(parsed && !invalid ? parsed.filters : null);
+  const response = listQuery.data;
+  const invalidResponse = response && (!Array.isArray(response.data) || !Number.isSafeInteger(response.total) || response.total < 0);
+  const visibleResult = { rows: invalidResponse ? [] : response?.data ?? [], total: invalidResponse ? 0 : response?.total ?? 0, loading: listQuery.isFetching || (!response && !listQuery.error), error: invalidResponse ? 'The server sent an unexpected gallery response.' : listQuery.error ? requestError(listQuery.error) : '' };
+  useEffect(() => { if (routerNavigation) setSearch(routerNavigation.search); }, [routerNavigation?.search]);
+  useEffect(() => { if ((optionsQuery.error instanceof ApiError && optionsQuery.error.status === 401) || (listQuery.error instanceof ApiError && listQuery.error.status === 401)) onExpired(); }, [optionsQuery.error, listQuery.error, onExpired]);
 
   function updateQuery(next: URLSearchParams) {
     const suffix = next.size ? `?${next}` : '';
     if (routerNavigation) routerNavigation.navigate(`/admin/gallery${suffix}`);
-    else window.history.pushState({}, '', `/admin/gallery${suffix}`);
     setSearch(suffix);
   }
 
@@ -178,12 +132,11 @@ export function GalleryCaseList({ onExpired, onCreate, onEdit }: { onExpired: ()
     updateQuery(next);
   }
 
-  const visibleResult = result.forSearch === search ? result : { forSearch: search, rows: [], total: 0, loading: true, error: '' };
   const totalPages = Math.max(1, Math.ceil(visibleResult.total / PAGE_SIZE));
   return (
     <section aria-label="Gallery case browser" className="mt-8">
-      {onCreate && <div className="mb-5 flex justify-end"><button type="button" onClick={onCreate} className="rounded-md bg-crimson px-4 py-2 font-semibold text-white">Create case</button></div>}
-      {optionsError ? <div className="rounded-xl border border-red-200 bg-white p-6"><p role="alert" className="text-red-800">{optionsError}</p><button onClick={() => setOptionsAttempt((value) => value + 1)} className="mt-4 rounded-md border border-slate-300 px-4 py-2">Retry</button></div> :
+      {onCreate && <div className="mb-5 flex justify-end"><a href="/admin/gallery/new" onClick={(event) => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) { event.preventDefault(); onCreate(); } }} className="rounded-md bg-crimson px-4 py-2 font-semibold text-white">Create case</a></div>}
+      {optionsError ? <div className="rounded-xl border border-red-200 bg-white p-6"><p role="alert" className="text-red-800">{optionsError}</p><button onClick={() => void optionsQuery.refetch()} className="mt-4 rounded-md border border-slate-300 px-4 py-2">Retry</button></div> :
       !options ? <p role="status">Loading gallery filters…</p> : <>
         <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
           <div><label htmlFor="gallery-status" className="block text-sm font-medium">Status</label><select id="gallery-status" value={invalid ? '' : parsed?.filters.status ?? ''} onChange={(event) => changeFilter('status', event.target.value)} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2"><option value="">All statuses</option><option value="draft">Draft</option><option value="unpublished">Unpublished</option><option value="published">Published</option></select></div>
@@ -193,11 +146,11 @@ export function GalleryCaseList({ onExpired, onCreate, onEdit }: { onExpired: ()
         </div>
         {invalid ? <div className="mt-6 rounded-xl border border-amber-200 bg-white p-6"><p role="alert" className="text-amber-900">The gallery link contains invalid filters or a page number. Reset the filters to continue.</p><button type="button" onClick={() => updateQuery(new URLSearchParams())} className="mt-4 rounded-md bg-crimson px-4 py-2 font-medium text-white">Reset filters</button></div> :
           visibleResult.loading ? <p role="status" className="mt-6">Loading gallery cases…</p> :
-          visibleResult.error ? <div className="mt-6 rounded-xl border border-red-200 bg-white p-6"><p role="alert" className="text-red-800">{visibleResult.error}</p><button type="button" onClick={() => setListAttempt((value) => value + 1)} className="mt-4 rounded-md border border-slate-300 px-4 py-2">Retry</button></div> :
+          visibleResult.error ? <div className="mt-6 rounded-xl border border-red-200 bg-white p-6"><p role="alert" className="text-red-800">{visibleResult.error}</p><button type="button" onClick={() => void listQuery.refetch()} className="mt-4 rounded-md border border-slate-300 px-4 py-2">Retry</button></div> :
           visibleResult.total === 0 ? <p className="mt-6 rounded-xl border border-slate-200 bg-white p-6 text-slate-600">No gallery cases match these filters.</p> :
           page > totalPages ? <div className="mt-6 rounded-xl border border-amber-200 bg-white p-6"><p role="alert">This page no longer has cases.</p><button type="button" onClick={() => changePage(1)} className="mt-4 rounded-md border border-slate-300 px-4 py-2">Go to first page</button></div> : <>
             <p role="status" className="mt-6 text-sm text-slate-600">{visibleResult.total} {visibleResult.total === 1 ? 'case' : 'cases'} · Page {page} of {totalPages} · Server display order</p>
-            <ul className="mt-4 grid gap-4">{visibleResult.rows.map((item) => <CaseCard key={item.id} item={item} options={options} onEdit={onEdit} />)}</ul>
+            <ul className="mt-4 grid gap-4">{visibleResult.rows.map((item) => <CaseCard key={item.id} item={item} options={options} search={search} onEdit={onEdit} />)}</ul>
             <nav aria-label="Gallery pages" className="mt-6 flex items-center justify-between gap-4">
               <button type="button" disabled={page <= 1} onClick={() => changePage(page - 1)} className="rounded-md border border-slate-300 px-4 py-2 font-medium disabled:opacity-50">Previous</button>
               <span className="text-sm">Page {page} of {totalPages}</span>

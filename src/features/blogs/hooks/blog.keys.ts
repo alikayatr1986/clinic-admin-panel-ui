@@ -5,4 +5,5 @@ export const blogKeys = {
   list: (filters: BlogFilters) => ['blogs', 'list', filters] as const,
   detail: (id: string) => ['blogs', 'detail', id] as const,
   preview: (id: string, locale: BlogLocale) => ['blogs', 'preview', id, locale] as const,
+  options: () => ['blogs', 'options'] as const,
 };

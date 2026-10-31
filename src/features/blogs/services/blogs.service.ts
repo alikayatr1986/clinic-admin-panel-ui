@@ -4,14 +4,14 @@ import type { BlogDetail, BlogFilters, BlogGenerationBrief, BlogGenerationJob, B
 const postPath = (id: string) => `/admin/api/blogs/${encodeURIComponent(id)}` as const;
 
 export const blogsApi = {
-  list(filters: BlogFilters = {}) {
+  list(filters: BlogFilters = {}, signal?: AbortSignal) {
     const query = new URLSearchParams();
     Object.entries(filters).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)); });
-    return adminRequest<BlogList>(`/admin/api/blogs${query.size ? `?${query}` : ''}`);
+    return adminRequest<BlogList>(`/admin/api/blogs${query.size ? `?${query}` : ''}`, { signal });
   },
-  options: () => adminRequest<{ data: BlogOptions }>('/admin/api/blog-options'),
-  get: (id: string) => adminRequest<{ data: BlogDetail }>(postPath(id)),
-  preview: (id: string, lang: BlogLocale, revision: number) => adminRequest<{ data: BlogPreviewDetail }>(`${postPath(id)}/preview?${new URLSearchParams({ lang, revision: String(revision) })}`),
+  options: (signal?: AbortSignal) => adminRequest<{ data: BlogOptions }>('/admin/api/blog-options', { signal }),
+  get: (id: string, signal?: AbortSignal) => adminRequest<{ data: BlogDetail }>(postPath(id), { signal }),
+  preview: (id: string, lang: BlogLocale, revision: number, signal?: AbortSignal) => adminRequest<{ data: BlogPreviewDetail }>(`${postPath(id)}/preview?${new URLSearchParams({ lang, revision: String(revision) })}`, { signal }),
   review: (id: string, revisionID: string, kind: BlogReviewKind, reference?: string) => adminRequest<{ data: { id: string; revision_id: string; review_kind: BlogReviewKind; created_at: string } }>(`${postPath(id)}/reviews`, { method: 'POST', body: JSON.stringify({ revision_id: revisionID, review_kind: kind, ...(reference ? { private_reference: reference } : {}) }) }),
   publish: (id: string, input: { expected_aggregate_revision: number; category_id: string; en_revision_id: string; ar_revision_id: string }) => adminRequest<{ data: { publication_id: string; aggregate_revision: number; first_published_at: string; last_published_at: string } }>(`${postPath(id)}/publish`, { method: 'POST', body: JSON.stringify(input) }),
   unpublish: (id: string, revision: number) => adminRequest<{ data: { id: string; aggregate_revision: number; unpublished: boolean } }>(`${postPath(id)}/unpublish`, { method: 'POST', body: JSON.stringify({ expected_revision: revision }) }),

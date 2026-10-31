@@ -1,10 +1,16 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, render as testingRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../lib/api';
 import { galleryApi } from '../services/gallery.service';
 import type { GalleryCase, GalleryOptions, GalleryUploadResult } from '../types/gallery.types';
 import { GalleryCaseEditor } from './GalleryCaseEditor';
+
+function render(element: React.ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return testingRender(<QueryClientProvider client={client}>{element}</QueryClientProvider>);
+}
 
 const options: GalleryOptions = {
   procedures: [{ code: 'synthetic-procedure', en: 'Synthetic procedure', ar: 'إجراء تجريبي' }],
@@ -39,6 +45,15 @@ function setup(item: GalleryCase = emptyCase) {
 }
 
 describe('gallery case editor', () => {
+  it('recovers from an initial case load failure after retry', async () => {
+    vi.spyOn(galleryApi, 'options').mockResolvedValue({ data: options });
+    vi.spyOn(galleryApi, 'get').mockRejectedValueOnce(new Error('offline')).mockResolvedValue({ data: emptyCase });
+    render(<GalleryCaseEditor caseID="case-1" onExpired={vi.fn()} onNavigate={vi.fn()} registerBlocker={vi.fn()} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+    expect(await screen.findByLabelText('Signed consent reference')).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('creates a private draft before opening the editor', async () => {
     vi.spyOn(galleryApi, 'options').mockResolvedValue({ data: options });
     const create = vi.spyOn(galleryApi, 'create').mockResolvedValue({ data: emptyCase });

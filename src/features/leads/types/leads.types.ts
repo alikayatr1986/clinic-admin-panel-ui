@@ -12,3 +12,4 @@ export interface LeadFilters { page: number; page_size: number; status: string; 
 export interface LeadListResponse { data: Lead[]; meta: { page: number; page_size: number; total: number } }
 export interface LeadListProps { onExpired: () => void; onOpen: (id: string) => void }
 export interface LeadDetailProps { id: string; onExpired: () => void; onBack: () => void }
+export interface LeadStatusUpdate { id: string; status: LeadStatus; revision: number }

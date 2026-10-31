@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { blogsApi } from '../services/blogs.service';
-import type { BlogBody, BlogBodyMark, BlogLocale, BlogPreviewDetail } from '../types/blogs.types';
+import type { BlogBodyMark, BlogPreviewDetail, BlogBodyProps, BlogPreviewProps } from '../types/blogs.types';
 
 export function safeBlogHref(value: string): boolean {
   if (!value || /[\\\s\u0000-\u001f\u007f]/u.test(value)) return false;
@@ -24,7 +24,7 @@ function markedText(text: string, marks: BlogBodyMark[] = []): ReactNode {
 }
 
 // This renderer and the later public renderer consume fixtures/blog-body-conformance.json.
-export function BlogBody({ body }: { body: BlogBody }) {
+export function BlogBody({ body }: BlogBodyProps) {
   if (body.schema_version !== 1) return <p role="alert">Unsupported article body.</p>;
   const anchors = new Set<string>();
   return <div className="space-y-4 break-words leading-relaxed">{body.blocks.map((block, i) => {
@@ -43,7 +43,7 @@ export function BlogBody({ body }: { body: BlogBody }) {
   })}</div>;
 }
 
-export function BlogPreview({ postID, locale, revision, dirty, onClose }: { postID: string; locale: BlogLocale; revision?: number; dirty: boolean; onClose: () => void }) {
+export function BlogPreview({ postID, locale, revision, dirty, onClose }: BlogPreviewProps) {
   const region = useRef<HTMLElement>(null);
   useEffect(() => { region.current?.focus(); }, []);
   const [article, setArticle] = useState<BlogPreviewDetail | null>(null); const [error, setError] = useState(''); const [attempt, setAttempt] = useState(0); const [mobile, setMobile] = useState(false);

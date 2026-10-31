@@ -1,9 +1,13 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { NavigationBoundary } from '../../../app/navigation';
+import type { ReactElement } from 'react';
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { blogsApi } from '../services/blogs.service';
 import { ApiError } from '../../../lib/api';
 import { BlogList } from './BlogList';
 
+function render(element: ReactElement) { if (!window.location.pathname.startsWith('/admin')) window.history.replaceState({}, '', '/admin/blogs'); const router = createBrowserRouter([{ element: <NavigationBoundary />, children: [{ path: '*', element }] }], { basename: '/admin' }); return rtlRender(<RouterProvider router={router} />); }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); window.history.replaceState({}, '', '/admin/blogs'); });
 const options = { limits: {}, generation_enabled: false, categories: [{ id: 'category-1', key: 'ent-health', name_en: 'ENT Health', name_ar: 'صحة' }] };
 
