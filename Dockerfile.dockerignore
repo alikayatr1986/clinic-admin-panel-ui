@@ -1,9 +1,0 @@
-**
-!admin-panel-frontend/
-!admin-panel-frontend/**
-admin-panel-frontend/node_modules/
-admin-panel-frontend/dist/
-admin-panel-frontend/.git/
-admin-panel-frontend/.env*
-!fixtures/
-!fixtures/blog-body-conformance.json

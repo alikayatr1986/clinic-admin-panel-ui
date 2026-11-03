@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "description": "Shared admin/public rendering contract. Mark ranges count Unicode code points; heading anchors use lowercase ASCII runs, heading-N fallback and -2 duplicate suffixes. Unknown blocks are omitted; unsafe links remain inert text.",
+  "cases": [
+    {
+      "name": "allowlisted blocks and unique anchors",
+      "body": { "schema_version": 1, "blocks": [
+        { "type": "heading", "level": 2, "text": "Care & Recovery" },
+        { "type": "heading", "level": 3, "text": "Care & Recovery" },
+        { "type": "heading", "level": 2, "text": "العناية" },
+        { "type": "paragraph", "text": "Plain strong emphasis link", "marks": [{ "type": "strong", "start": 6, "end": 12 }, { "type": "em", "start": 13, "end": 21 }, { "type": "link", "start": 22, "end": 26, "href": "https://example.com/source" }] },
+        { "type": "list", "style": "ordered", "items": ["First", "Second"] },
+        { "type": "list", "style": "unordered", "items": ["One"] },
+        { "type": "blockquote", "text": "A quotation" }
+      ] },
+      "anchors": ["care-recovery", "care-recovery-2", "heading-3"],
+      "strong": ["strong"], "em": ["emphasis"], "links": ["https://example.com/source"],
+      "text": ["First", "Second", "One", "A quotation"]
+    },
+    {
+      "name": "Arabic and astral code point ranges",
+      "body": { "schema_version": 1, "blocks": [{ "type": "paragraph", "text": "😀عربي نص", "marks": [{ "type": "strong", "start": 1, "end": 5 }, { "type": "em", "start": 6, "end": 8 }, { "type": "link", "start": 0, "end": 1, "href": "/blog/article" }] }] },
+      "anchors": [], "strong": ["عربي"], "em": ["نص"], "links": ["/blog/article"], "text": ["😀", "عربي", "نص"]
+    },
+    {
+      "name": "intersecting marks remain lossless with invalid ranges ignored",
+      "body": { "schema_version": 1, "blocks": [{ "type": "paragraph", "text": "abcdefgh", "marks": [
+        { "type": "strong", "start": 0, "end": 5 },
+        { "type": "em", "start": 2, "end": 7 },
+        { "type": "link", "start": 3, "end": 6, "href": "/blog/source" },
+        { "type": "link", "start": -1, "end": 3, "href": "javascript:alert(1)" },
+        { "type": "strong", "start": 1, "end": 99 },
+        { "type": "em", "start": 4, "end": 4 },
+        { "type": "link", "start": 5, "end": 2, "href": "/invalid" },
+        { "type": "strong", "start": 1.5, "end": 2 }
+      ] }] },
+      "anchors": [], "strong": ["ab", "c", "de"], "em": ["c", "de", "f", "g"], "links": ["/blog/source", "/blog/source"], "text": ["abcdefgh"]
+    },
+    {
+      "name": "heading suffixes avoid collisions with naturally suffixed headings",
+      "body": { "schema_version": 1, "blocks": [
+        { "type": "heading", "level": 2, "text": "foo" },
+        { "type": "heading", "level": 2, "text": "foo-2" },
+        { "type": "heading", "level": 2, "text": "foo" }
+      ] },
+      "anchors": ["foo", "foo-2", "foo-3"], "strong": [], "em": [], "links": [], "text": ["foo"]
+    },
+    {
+      "name": "hostile text and unsafe links stay inert",
+      "body": { "schema_version": 1, "blocks": [
+        { "type": "paragraph", "text": "<script>alert(1)</script>", "marks": [{ "type": "link", "start": 0, "end": 8, "href": "javascript:alert(1)" }] },
+        { "type": "paragraph", "text": "unsafe", "marks": [{ "type": "link", "start": 0, "end": 6, "href": "//example.com" }] },
+        { "type": "list", "style": "unordered", "items": ["<img src=x onerror=alert(1)>"] },
+        { "type": "iframe", "text": "unknown node" }
+      ] },
+      "anchors": [], "strong": [], "em": [], "links": [], "text": ["<script>alert(1)</script>", "unsafe", "<img src=x onerror=alert(1)>"]
+    }
+  ]
+}

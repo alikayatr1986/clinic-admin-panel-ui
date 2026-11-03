@@ -20,13 +20,13 @@ For production, serve the built SPA at `/admin/*` with an index fallback for pag
 
 This deploys the admin SPA on one server. Deploy the Go backend and its database and storage first; see [backend production deployment](../backend/PRODUCTION.md). Install Docker with the Compose plugin and configure an HTTPS reverse proxy on the host. The admin image contains no backend or credentials.
 
-1. Build from the repository root, replacing `RELEASE` with your release identifier. The build needs both `admin-panel-frontend/` and the shared `fixtures/blog-body-conformance.json`, which the TypeScript check uses:
+1. From the admin panel folder, build the image, replacing `RELEASE` with your release identifier:
 
    ```sh
-   docker build -f admin-panel-frontend/Dockerfile -t clinic-admin:RELEASE .
+   docker build -t clinic-admin:RELEASE .
    ```
 
-   If building elsewhere, transfer the image to the server through your registry or image transfer process. Keep the previous image for rollback.
+   The included `fixtures/blog-body-conformance.json` is a copy of the shared rendering contract used during the build. Keep it in sync with the repository's `fixtures/blog-body-conformance.json` when that contract changes. If building elsewhere, transfer the image to the server through your registry or image transfer process. Keep the previous image for rollback.
 
 2. On the server, copy `compose.production.yml` from the same release and run:
 
@@ -37,7 +37,7 @@ This deploys the admin SPA on one server. Deploy the Go backend and its database
    docker compose -f compose.production.yml ps
    ```
 
-   The container listens on host loopback at `127.0.0.1:8081`. It serves `/admin/` and nested SPA routes. API requests must go directly to Go through the HTTPS proxy.
+   The container listens on host loopback at `127.0.0.1:8082`. It serves `/admin/` and nested SPA routes. API requests must go directly to Go through the HTTPS proxy.
 
 3. Add these locations to the existing HTTPS Nginx server for the same origin as the admin panel. This assumes the backend listens on `127.0.0.1:8080`, as in its production guide:
 
@@ -52,7 +52,7 @@ This deploys the admin SPA on one server. Deploy the Go backend and its database
    }
    location ^~ /admin/ {
        proxy_set_header Host $host;
-       proxy_pass http://127.0.0.1:8081;
+       proxy_pass http://127.0.0.1:8082;
    }
    ```
 
