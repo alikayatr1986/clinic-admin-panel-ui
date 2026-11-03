@@ -20,10 +20,10 @@ For production, serve the built SPA at `/admin/*` with an index fallback for pag
 
 This deploys the admin SPA on one server. Deploy the Go backend and its database and storage first; see [backend production deployment](../backend/PRODUCTION.md). Install Docker with the Compose plugin and configure an HTTPS reverse proxy on the host. The admin image contains no backend or credentials.
 
-1. Build from this directory, replacing `RELEASE` with your release identifier:
+1. Build from the repository root, replacing `RELEASE` with your release identifier. The build needs both `admin-panel-frontend/` and the shared `fixtures/blog-body-conformance.json`, which the TypeScript check uses:
 
    ```sh
-   docker build -t clinic-admin:RELEASE .
+   docker build -f admin-panel-frontend/Dockerfile -t clinic-admin:RELEASE .
    ```
 
    If building elsewhere, transfer the image to the server through your registry or image transfer process. Keep the previous image for rollback.
