@@ -147,4 +147,10 @@ export interface GalleryPreviewState { url: string; expires_at: string }
 
 export interface GalleryContentEditorProps { username: string; onExpired: () => void; onBack: () => void; registerBlocker: (blocker: (() => boolean) | null) => void }
 export type GalleryContentForm = { eyebrow: string; heading: string; introduction: string; statistics: GalleryStatistic[] };
-export interface GalleryContentRecovery { lang: GalleryLocale; form: GalleryContentForm; revision: number }
+export interface GalleryContentRecovery {
+  lang: GalleryLocale;
+  form?: GalleryContentForm;
+  forms?: Record<GalleryLocale, GalleryContentForm | null>;
+  revision?: number;
+  revisions?: Record<GalleryLocale, number>;
+}

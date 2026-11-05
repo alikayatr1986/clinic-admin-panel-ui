@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { ApiError } from '../../../lib/api';
 import { useGalleryList } from '../../gallery/hooks/useGallery';
 import { describeError } from '../../auth/utils/auth.utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import type { DashboardPageProps } from '../types/dashboard.types';
 
 export function DashboardPage({ onExpired }: DashboardPageProps) {
@@ -14,37 +16,44 @@ export function DashboardPage({ onExpired }: DashboardPageProps) {
   const totalGalleryCases = data?.total;
 
   return (
-    <section
-      className="mt-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
-      aria-label="Gallery overview"
-    >
-      <h2 className="text-xl font-semibold">Gallery cases</h2>
-      {isLoading ? (
-        <p role="status" className="mt-3 text-slate-600">
-          Loading gallery…
-        </p>
-      ) : error ? (
-        <div className="mt-3">
-          <p role="alert" className="text-red-800">
-            {describeError(error)}
-          </p>
-          <button
-            type="button"
-            disabled={isFetching}
-            onClick={() => void refetch()}
-            className="mt-4 rounded-md bg-crimson px-3.5 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
-          >
-            {isFetching ? 'Retrying…' : 'Retry'}
-          </button>
-        </div>
-      ) : totalGalleryCases == null || totalGalleryCases === 0 ? (
-        <p className="mt-3 text-slate-600">No gallery cases yet.</p>
-      ) : (
-        <p className="mt-3 text-slate-600">
-          {totalGalleryCases} gallery{' '}
-          {totalGalleryCases === 1 ? 'case' : 'cases'} available.
-        </p>
-      )}
+    <section aria-label="Gallery overview" className="mt-8">
+      <Card>
+        <CardHeader>
+          <CardTitle asChild className="text-xl">
+            <h2>Gallery cases</h2>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p role="status" className="text-muted-foreground">
+              Loading gallery…
+            </p>
+          ) : error ? (
+            <div>
+              <p role="alert" className="text-destructive">
+                {describeError(error)}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isFetching}
+                onClick={() => void refetch()}
+                className="mt-4"
+              >
+                {isFetching ? 'Retrying…' : 'Retry'}
+              </Button>
+            </div>
+          ) : totalGalleryCases == null || totalGalleryCases === 0 ? (
+            <p className="text-muted-foreground">No gallery cases yet.</p>
+          ) : (
+            <p className="text-muted-foreground">
+              {totalGalleryCases} gallery{' '}
+              {totalGalleryCases === 1 ? 'case' : 'cases'} available.
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </section>
   );
 }
+

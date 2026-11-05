@@ -24,7 +24,7 @@ export function GalleryContentEditor({
   const [lang, setLang] = useState<GalleryLocale>(() => {
     try {
       const value = sessionStorage.getItem(recoveryKey);
-      const recovered = value ? JSON.parse(value) : null;
+      const recovered: GalleryContentRecovery | null = value ? JSON.parse(value) : null;
       return recovered?.lang === 'ar' ? 'ar' : 'en';
     } catch {
       return 'en';
@@ -75,13 +75,10 @@ export function GalleryContentEditor({
       (queryAr.error instanceof ApiError && queryAr.error.status === 401);
     if (error401) {
       try {
-        const currentForm = forms[lang];
-        if (currentForm) {
-          sessionStorage.setItem(
-            recoveryKey,
-            JSON.stringify({ lang, form: currentForm, revision: revisions[lang] })
-          );
-        }
+        sessionStorage.setItem(
+          recoveryKey,
+          JSON.stringify({ lang, forms, revisions })
+        );
         onExpired();
       } catch {
         setErrorByLocale((prev) => ({
@@ -118,17 +115,33 @@ export function GalleryContentEditor({
         /* storage unavailable */
       }
 
-      if (restored && restored.lang === l) {
-        setForms((prev) => ({ ...prev, [l]: restored!.form }));
-        setRevisions((prev) => ({ ...prev, [l]: restored!.revision }));
-        sessionStorage.removeItem(recoveryKey);
-        if (restored.revision !== (item?.revision ?? 1)) {
-          setConflicts((prev) => ({ ...prev, [l]: true }));
+      if (restored) {
+        if (restored.forms && restored.forms[l]) {
+          const restoredForm = restored.forms[l]!;
+          const restoredRev = restored.revisions?.[l] ?? (item?.revision ?? 1);
+          setForms((prev) => ({ ...prev, [l]: restoredForm }));
+          setRevisions((prev) => ({ ...prev, [l]: restoredRev }));
+          if (restoredRev !== (item?.revision ?? 1)) {
+            setConflicts((prev) => ({ ...prev, [l]: true }));
+          }
+          setNoticeByLocale((prev) => ({
+            ...prev,
+            [l]: 'Your edits were restored after session expiry.',
+          }));
+        } else if (restored.lang === l && restored.form) {
+          setForms((prev) => ({ ...prev, [l]: restored.form! }));
+          setRevisions((prev) => ({ ...prev, [l]: restored.revision ?? (item?.revision ?? 1) }));
+          if ((restored.revision ?? 1) !== (item?.revision ?? 1)) {
+            setConflicts((prev) => ({ ...prev, [l]: true }));
+          }
+          setNoticeByLocale((prev) => ({
+            ...prev,
+            [l]: 'Your edits were restored after session expiry.',
+          }));
+        } else {
+          setForms((prev) => ({ ...prev, [l]: initial }));
+          setRevisions((prev) => ({ ...prev, [l]: item?.revision ?? 1 }));
         }
-        setNoticeByLocale((prev) => ({
-          ...prev,
-          [l]: 'Your edits were restored after session expiry.',
-        }));
       } else {
         setForms((prev) => ({ ...prev, [l]: initial }));
         setRevisions((prev) => ({ ...prev, [l]: item?.revision ?? 1 }));
@@ -166,9 +179,9 @@ export function GalleryContentEditor({
     };
   }, [dirty, hasConflict, save.isPending, recovering, registerBlocker]);
 
-  async function submit(approval: 'draft' | 'approved') {
-    const currentForm = forms[lang];
-    if (!currentForm || save.isPending || recovering || conflicts[lang]) return;
+  async function submit(locale: GalleryLocale, approval: 'draft' | 'approved') {
+    const currentForm = forms[locale];
+    if (!currentForm || save.isPending || recovering || conflicts[locale]) return;
 
     const fields: Record<string, string> = {};
     for (const [key, limit] of [
@@ -200,22 +213,22 @@ export function GalleryContentEditor({
       keys.add(key);
     });
     if (Object.keys(fields).length) {
-      setErrorsByLocale((prev) => ({ ...prev, [lang]: fields }));
-      setErrorByLocale((prev) => ({ ...prev, [lang]: "Check the highlighted fields." }));
+      setErrorsByLocale((prev) => ({ ...prev, [locale]: fields }));
+      setErrorByLocale((prev) => ({ ...prev, [locale]: "Check the highlighted fields." }));
       return;
     }
-    setErrorsByLocale((prev) => ({ ...prev, [lang]: {} }));
-    setErrorByLocale((prev) => ({ ...prev, [lang]: "" }));
-    setNoticeByLocale((prev) => ({ ...prev, [lang]: "" }));
+    setErrorsByLocale((prev) => ({ ...prev, [locale]: {} }));
+    setErrorByLocale((prev) => ({ ...prev, [locale]: "" }));
+    setNoticeByLocale((prev) => ({ ...prev, [locale]: "" }));
 
     try {
       const response = await save.mutateAsync({
-        lang,
-        expected_revision: revisions[lang],
+        lang: locale,
+        expected_revision: revisions[locale],
         ...currentForm,
         approval,
       });
-      const item = response.data.find((entry) => entry.lang === lang);
+      const item = response.data.find((entry) => entry.lang === locale);
       if (!item)
         throw new Error("The server did not return the saved content.");
       const saved = {
@@ -224,34 +237,34 @@ export function GalleryContentEditor({
         introduction: item.introduction,
         statistics: item.statistics ?? [],
       };
-      setForms((prev) => ({ ...prev, [lang]: saved }));
-      setBaselines((prev) => ({ ...prev, [lang]: JSON.stringify(saved) }));
-      setRevisions((prev) => ({ ...prev, [lang]: item.revision }));
-      setStatuses((prev) => ({ ...prev, [lang]: item.approval }));
+      setForms((prev) => ({ ...prev, [locale]: saved }));
+      setBaselines((prev) => ({ ...prev, [locale]: JSON.stringify(saved) }));
+      setRevisions((prev) => ({ ...prev, [locale]: item.revision }));
+      setStatuses((prev) => ({ ...prev, [locale]: item.approval }));
       setNoticeByLocale((prev) => ({
         ...prev,
-        [lang]: `Server saved revision ${item.revision} with status ${item.approval}.`,
+        [locale]: `Server saved revision ${item.revision} with status ${item.approval}.`,
       }));
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) {
         try {
           sessionStorage.setItem(
             recoveryKey,
-            JSON.stringify({ lang, form: currentForm, revision: revisions[lang] })
+            JSON.stringify({ lang, forms, revisions })
           );
           onExpired();
         } catch {
           setErrorByLocale((prev) => ({
             ...prev,
-            [lang]: 'Your session expired and your edits could not be stored. Copy them before signing in again.',
+            [locale]: 'Your session expired and your edits could not be stored. Copy them before signing in again.',
           }));
         }
       } else {
         const is409 = failure instanceof ApiError && failure.status === 409;
-        setConflicts((prev) => ({ ...prev, [lang]: is409 }));
+        setConflicts((prev) => ({ ...prev, [locale]: is409 }));
         setErrorsByLocale((prev) => ({
           ...prev,
-          [lang]: failure instanceof ApiError
+          [locale]: failure instanceof ApiError
             ? Object.fromEntries(
                 Object.entries(failure.fields ?? {}).map(([k, v]) => [
                   k.replace(/\[(\d+)\]/g, '.$1'),
@@ -262,7 +275,7 @@ export function GalleryContentEditor({
         }));
         setErrorByLocale((prev) => ({
           ...prev,
-          [lang]: is409
+          [locale]: is409
             ? "This content changed elsewhere. Your edits are still here; copy them before leaving."
             : failure instanceof Error
               ? failure.message
@@ -272,15 +285,15 @@ export function GalleryContentEditor({
     }
   }
 
-  async function recover(reload: boolean) {
+  async function recover(locale: GalleryLocale, reload: boolean) {
     if (recovering || save.isPending) return;
     if (reload && !window.confirm('Discard your edits and reload the server content?')) return;
     setRecovering(true);
-    const q = lang === 'en' ? queryEn : queryAr;
+    const q = locale === 'en' ? queryEn : queryAr;
     try {
       const result = await q.refetch();
       if (result.error || !result.data) throw result.error ?? new Error('Reload failed');
-      const item = result.data.data.find((entry) => entry.lang === lang);
+      const item = result.data.data.find((entry) => entry.lang === locale);
       const current = item
         ? {
             eyebrow: item.eyebrow,
@@ -289,25 +302,25 @@ export function GalleryContentEditor({
             statistics: item.statistics ?? [],
           }
         : { eyebrow: '', heading: '', introduction: '', statistics: [] };
-      setRevisions((prev) => ({ ...prev, [lang]: item?.revision ?? 1 }));
-      setStatuses((prev) => ({ ...prev, [lang]: item?.approval ?? '' }));
-      setBaselines((prev) => ({ ...prev, [lang]: JSON.stringify(current) }));
+      setRevisions((prev) => ({ ...prev, [locale]: item?.revision ?? 1 }));
+      setStatuses((prev) => ({ ...prev, [locale]: item?.approval ?? '' }));
+      setBaselines((prev) => ({ ...prev, [locale]: JSON.stringify(current) }));
       if (reload) {
-        setForms((prev) => ({ ...prev, [lang]: current }));
+        setForms((prev) => ({ ...prev, [locale]: current }));
       }
-      setConflicts((prev) => ({ ...prev, [lang]: false }));
-      setErrorsByLocale((prev) => ({ ...prev, [lang]: {} }));
-      setErrorByLocale((prev) => ({ ...prev, [lang]: '' }));
+      setConflicts((prev) => ({ ...prev, [locale]: false }));
+      setErrorsByLocale((prev) => ({ ...prev, [locale]: {} }));
+      setErrorByLocale((prev) => ({ ...prev, [locale]: '' }));
       setNoticeByLocale((prev) => ({
         ...prev,
-        [lang]: reload
+        [locale]: reload
           ? 'Server content reloaded.'
           : 'Edits retained. Saving or publishing will overwrite the current server draft.',
       }));
     } catch {
       setErrorByLocale((prev) => ({
         ...prev,
-        [lang]: 'Could not load server content. Your edits are retained; try again.',
+        [locale]: 'Could not load server content. Your edits are retained; try again.',
       }));
     } finally {
       setRecovering(false);
@@ -380,7 +393,10 @@ export function GalleryContentEditor({
           </div>
         )}
         {localeConflict && (
-          <Card className="space-y-3 p-4">
+          <div
+            role="alert"
+            className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4"
+          >
             <p>
               Reload discards your edits. Reapply keeps them; a later save or publish overwrites the current server draft.
             </p>
@@ -389,7 +405,7 @@ export function GalleryContentEditor({
                 type="button"
                 variant="outline"
                 disabled={recovering}
-                onClick={() => void recover(true)}
+                onClick={() => void recover(locale, true)}
               >
                 Reload server content
               </Button>
@@ -397,12 +413,12 @@ export function GalleryContentEditor({
                 type="button"
                 variant="outline"
                 disabled={recovering}
-                onClick={() => void recover(false)}
+                onClick={() => void recover(locale, false)}
               >
                 Reapply my edits
               </Button>
             </div>
-          </Card>
+          </div>
         )}
         {localeNotice && (
           <p
@@ -417,12 +433,46 @@ export function GalleryContentEditor({
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              void submit('draft');
+              void submit(locale, 'draft');
             }}
             noValidate
           >
             <fieldset disabled={save.isPending || recovering} className="space-y-5">
-              {(["eyebrow", "heading", "introduction"] as const).map(
+              <div>
+                <Label
+                  htmlFor={`${locale}-eyebrow`}
+                  className="block text-sm font-medium capitalize"
+                >
+                  Eyebrow
+                </Label>
+                <Input
+                  id={`${locale}-eyebrow`}
+                  lang={locale}
+                  dir={locale === "ar" ? "rtl" : "ltr"}
+                  value={currentForm.eyebrow}
+                  aria-invalid={Boolean(localeErrors.eyebrow)}
+                  aria-describedby={
+                    localeErrors.eyebrow ? `${locale}-eyebrow-error` : undefined
+                  }
+                  onChange={(event) => {
+                    setForms((prev) => ({
+                      ...prev,
+                      [locale]: prev[locale]
+                        ? { ...prev[locale]!, eyebrow: event.target.value }
+                        : prev[locale],
+                    }));
+                    setNoticeByLocale((prev) => ({ ...prev, [locale]: "" }));
+                  }}
+                  className="mt-2"
+                />
+                {localeErrors.eyebrow ? (
+                  <p id={`${locale}-eyebrow-error`} className="mt-1 text-sm text-red-800">
+                    {localeErrors.eyebrow}
+                  </p>
+                ) : null}
+              </div>
+
+              {(["heading", "introduction"] as const).map(
                 (key) => (
                   <div key={key}>
                     <Label
@@ -579,7 +629,7 @@ export function GalleryContentEditor({
                   type="button"
                   variant="default"
                   disabled={save.isPending || localeConflict}
-                  onClick={() => void submit('approved')}
+                  onClick={() => void submit(locale, 'approved')}
                 >
                   Publish reviewed content
                 </Button>
@@ -617,7 +667,7 @@ export function GalleryContentEditor({
         <TabsContent value="en">
           {renderLocaleContent('en')}
         </TabsContent>
-        <TabsContent value="ar">
+        <TabsContent value="ar" dir="rtl">
           {renderLocaleContent('ar')}
         </TabsContent>
       </Tabs>

@@ -573,14 +573,15 @@ export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlock
         </div>
         {preview && (
           <p className="mt-4 rounded-md bg-slate-100 p-4">
-            <a
-              href={preview.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-crimson underline"
-            >
-              Open private preview
-            </a>
+            <Button asChild variant="link" className="p-0 h-auto font-medium">
+              <a
+                href={preview.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open private preview
+              </a>
+            </Button>
             <span className="ml-2 text-sm text-slate-600">
               Expires {new Date(preview.expires_at).toLocaleString('en')}
             </span>

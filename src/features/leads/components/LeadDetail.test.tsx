@@ -98,4 +98,30 @@ describe('Lead detail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByText(lead.name)).toBeInTheDocument();
   });
+
+  it('calls onExpired when query fails with 401', async () => {
+    const onExpired = vi.fn();
+    vi.spyOn(leadsApi, 'get').mockRejectedValueOnce(new ApiError(401, 'UNAUTHORIZED', 'expired'));
+    render(<LeadDetail id="opaque" onExpired={onExpired} onBack={vi.fn()} />);
+    await waitFor(() => expect(onExpired).toHaveBeenCalledOnce());
+  });
+
+  it('calls onExpired when status mutation fails with 401', async () => {
+    const onExpired = vi.fn();
+    vi.spyOn(leadsApi, 'get').mockResolvedValue({ data: lead });
+    vi.spyOn(leadsApi, 'status').mockRejectedValueOnce(new ApiError(401, 'UNAUTHORIZED', 'expired'));
+    render(<LeadDetail id="opaque" onExpired={onExpired} onBack={vi.fn()} />);
+    await screen.findByText(lead.name);
+    fireEvent.change(screen.getByLabelText('Change status'), { target: { value: 'contacted' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Update status' }));
+    await waitFor(() => expect(onExpired).toHaveBeenCalledOnce());
+  });
+
+  it('displays the incomplete record note when legacy_incomplete is true', async () => {
+    const incompleteLead: Lead = { ...lead, legacy_incomplete: true };
+    vi.spyOn(leadsApi, 'get').mockResolvedValue({ data: incompleteLead });
+    render(<LeadDetail id="opaque" onExpired={vi.fn()} onBack={vi.fn()} />);
+    await screen.findByText(lead.name);
+    expect(screen.getByText('This historical record is incomplete.')).toBeInTheDocument();
+  });
 });

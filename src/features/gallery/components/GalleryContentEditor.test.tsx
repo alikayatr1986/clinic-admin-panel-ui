@@ -169,4 +169,93 @@ describe('GalleryContentEditor', () => {
       await screen.findByText(/Edits retained. Saving or publishing will overwrite/)
     ).toBeInTheDocument();
   });
+
+  it('stores drafts to sessionStorage on 401 expiry, calls onExpired, and restores drafts on mount', async () => {
+    vi.spyOn(galleryApi, 'content').mockResolvedValue({ data: [enContent] });
+    const update = vi.spyOn(galleryApi, 'updateContent').mockRejectedValue(
+      new ApiError(401, 'UNAUTHORIZED', 'Session expired')
+    );
+    const onExpired = vi.fn();
+    const user = userEvent.setup();
+
+    renderEditor({ username: 'dr-naserzadeh', onExpired });
+
+    const eyebrow = await screen.findByLabelText(/eyebrow/i);
+    await user.type(eyebrow, ' Expiring Edit');
+
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    expect(update).toHaveBeenCalled();
+    expect(onExpired).toHaveBeenCalled();
+
+    const saved = sessionStorage.getItem('gallery-content-recovery:dr-naserzadeh');
+    expect(saved).not.toBeNull();
+    const parsed = JSON.parse(saved!);
+    expect(parsed.forms.en.eyebrow).toBe('Clinical Results Expiring Edit');
+
+    cleanup();
+
+    renderEditor({ username: 'dr-naserzadeh' });
+    const restoredEyebrow = await screen.findByLabelText(/eyebrow/i);
+    expect(restoredEyebrow).toHaveValue('Clinical Results Expiring Edit');
+    expect(screen.getByText('Your edits were restored after session expiry.')).toBeInTheDocument();
+  });
+
+  it('registers a confirmation blocker when either locale is dirty', async () => {
+    vi.spyOn(galleryApi, 'content').mockResolvedValue({ data: [enContent] });
+    let currentBlocker: (() => boolean) | null = null;
+    const registerBlocker = vi.fn((blocker) => {
+      currentBlocker = blocker;
+    });
+    const user = userEvent.setup();
+
+    renderEditor({ registerBlocker });
+
+    const eyebrow = await screen.findByLabelText(/eyebrow/i);
+    expect(currentBlocker).toBeNull();
+
+    await user.type(eyebrow, ' Dirty');
+    expect(currentBlocker).toBeTypeOf('function');
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    expect(currentBlocker!()).toBe(true);
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'You have unsaved changes or a save in progress. Leave this editor?'
+    );
+  });
+
+  it('calls updateContent with approval: draft and updates status on successful save', async () => {
+    vi.spyOn(galleryApi, 'content').mockResolvedValue({ data: [enContent] });
+    const update = vi.spyOn(galleryApi, 'updateContent').mockResolvedValue({
+      data: [{
+        ...enContent,
+        eyebrow: 'Clinical Results Draft',
+        revision: 4,
+        approval: 'draft',
+      }],
+    });
+    const user = userEvent.setup();
+
+    renderEditor();
+
+    const eyebrow = await screen.findByLabelText(/eyebrow/i);
+    await user.type(eyebrow, ' Draft');
+
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith({
+        lang: 'en',
+        expected_revision: 3,
+        eyebrow: 'Clinical Results Draft',
+        heading: 'Before & After Gallery',
+        introduction: 'Explore our documented procedures and patient outcomes.',
+        statistics: enContent.statistics,
+        approval: 'draft',
+      });
+    });
+
+    expect(await screen.findByText('Server saved revision 4 with status draft.')).toBeInTheDocument();
+    expect(screen.getByText(/Revision 4 · Status: draft/)).toBeInTheDocument();
+  });
 });

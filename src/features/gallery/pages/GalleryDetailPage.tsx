@@ -7,6 +7,7 @@ import {
   Card,
   CardHeader,
   CardTitle,
+  CardDescription,
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
@@ -60,19 +61,19 @@ export function GalleryDetailPage({
       ? returnTo
       : "/admin/gallery";
   return (
-    <Card className="mt-8 space-y-5 p-6">
-      <CardHeader className="p-0">
+    <Card className="mt-8">
+      <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-xl">Case {item.id}</CardTitle>
           <Badge variant={item.published ? "default" : "secondary"}>
             {item.published ? "Published" : "Unpublished"}
           </Badge>
         </div>
-        <p className="text-sm text-slate-600">
+        <CardDescription>
           Revision {item.revision}
-        </p>
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-5 p-0">
+      <CardContent className="space-y-5">
         {item.url && (
           <img
             src={item.url}
@@ -102,7 +103,7 @@ export function GalleryDetailPage({
         ))}
         {error && <p role="alert" className="text-red-800">{error}</p>}
       </CardContent>
-      <CardFooter className="flex flex-wrap gap-3 p-0">
+      <CardFooter className="flex flex-wrap gap-3">
         <Button
           asChild
           variant="outline"

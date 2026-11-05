@@ -192,6 +192,8 @@ describe('useSettings hooks', () => {
     expect(categoryAction).toHaveBeenCalledWith('cat-1', 'delete');
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: settingsKeys.procedures() });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: settingsKeys.blogCategories() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['gallery', 'options'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['blogs', 'options'] });
   });
 });
 

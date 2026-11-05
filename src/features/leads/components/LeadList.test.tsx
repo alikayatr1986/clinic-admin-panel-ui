@@ -57,14 +57,87 @@ describe('Lead list', () => {
     expect(screen.queryByLabelText('Procedure')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Status')).not.toBeInTheDocument();
   });
-  it('clears data and triggers expiry or denial on failed requests', async () => {
-    vi.spyOn(leadsApi, 'options').mockResolvedValue({ data: [] });
-    const onExpired = vi.fn();
-    vi.spyOn(leadsApi, 'list').mockRejectedValueOnce(new ApiError(401, 'UNAUTHORIZED', '')).mockRejectedValueOnce(new ApiError(403, 'FORBIDDEN', ''));
-    const { unmount } = render(<LeadList onExpired={onExpired} onOpen={vi.fn()} />);
-    await waitFor(() => expect(onExpired).toHaveBeenCalledOnce());
-    unmount(); render(<LeadList onExpired={onExpired} onOpen={vi.fn()} />);
+  it('clears cached rows and shows access denied when lead query fails with 403', async () => {
+    vi.spyOn(leadsApi, 'options').mockResolvedValue({ data: ['nose'] });
+    vi.spyOn(leadsApi, 'list')
+      .mockResolvedValueOnce({ data: [lead], meta: { page: 1, page_size: 20, total: 1 } })
+      .mockRejectedValueOnce(new ApiError(403, 'FORBIDDEN', 'denied'));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    rtlRender(
+      <QueryClientProvider client={client}>
+        <LeadList onExpired={vi.fn()} onOpen={vi.fn()} />
+      </QueryClientProvider>
+    );
+    expect(await screen.findByText('Example')).toBeInTheDocument();
+    await act(async () => {
+      await client.invalidateQueries({ queryKey: leadsKeys.all });
+    });
     expect(await screen.findByRole('alert')).toHaveTextContent('Access denied');
     expect(screen.queryByText('Example')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Status')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Procedure')).not.toBeInTheDocument();
+  });
+
+  it('triggers onExpired when lead query fails with 401', async () => {
+    vi.spyOn(leadsApi, 'options').mockResolvedValue({ data: [] });
+    const onExpired = vi.fn();
+    vi.spyOn(leadsApi, 'list').mockRejectedValueOnce(new ApiError(401, 'UNAUTHORIZED', ''));
+    render(<LeadList onExpired={onExpired} onOpen={vi.fn()} />);
+    await waitFor(() => expect(onExpired).toHaveBeenCalledOnce());
+  });
+
+  it('handles pagination navigation and boundary disabled states', async () => {
+    vi.spyOn(leadsApi, 'options').mockResolvedValue({ data: [] });
+    const listSpy = vi.spyOn(leadsApi, 'list').mockImplementation(async (filters: LeadFilters) => ({
+      data: [lead],
+      meta: { page: filters.page, page_size: 20, total: 40 },
+    }));
+    render(<LeadList onExpired={vi.fn()} onOpen={vi.fn()} />);
+    await screen.findByText('Example');
+
+    const prevButton = screen.getByRole('button', { name: 'Previous' });
+    const nextButton = screen.getByRole('button', { name: 'Next' });
+
+    expect(prevButton).toBeDisabled();
+    expect(nextButton).toBeEnabled();
+
+    fireEvent.click(nextButton);
+    await waitFor(() =>
+      expect(listSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 2 }),
+        expect.any(Array),
+        expect.any(AbortSignal)
+      )
+    );
+    expect(await screen.findByText('Page 2 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
+    await waitFor(() =>
+      expect(listSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ page: 1 }),
+        expect.any(Array),
+        expect.any(AbortSignal)
+      )
+    );
+    expect(await screen.findByText('Page 1 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+  });
+
+  it('displays query error and recovers when retry button is clicked', async () => {
+    vi.spyOn(leadsApi, 'options').mockResolvedValue({ data: [] });
+    const listSpy = vi
+      .spyOn(leadsApi, 'list')
+      .mockRejectedValueOnce(new Error('server down'))
+      .mockResolvedValueOnce({ data: [lead], meta: { page: 1, page_size: 20, total: 1 } });
+    render(<LeadList onExpired={vi.fn()} onOpen={vi.fn()} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load leads. Try again.');
+    const retryButton = screen.getByRole('button', { name: 'Retry' });
+    expect(retryButton).toBeInTheDocument();
+    fireEvent.click(retryButton);
+    expect(await screen.findByText('Example')).toBeInTheDocument();
+    expect(listSpy).toHaveBeenCalledTimes(2);
   });
 });

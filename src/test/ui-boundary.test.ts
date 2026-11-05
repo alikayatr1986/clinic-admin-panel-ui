@@ -14,6 +14,11 @@ const SHARED_PRIMITIVES = new Set([
   'Textarea',
   'Badge',
   'Card',
+  'CardHeader',
+  'CardTitle',
+  'CardDescription',
+  'CardContent',
+  'CardFooter',
   'Label',
   'Table',
   'TableHeader',
@@ -332,7 +337,7 @@ describe('UI Boundary Structural Check', () => {
     expect(allViolations).toEqual([]);
   });
 
-  it('ensures zero unauthorized raw controls in migrated auth, app, layout, settings, blog, and gallery production files', () => {
+  it('ensures zero unauthorized raw controls in migrated auth, app, layout, settings, blog, gallery, dashboard, and lead production files', () => {
     const migratedFiles = [
       'src/features/auth/components/LoginPage.tsx',
       'src/app/AdminApp.tsx',
@@ -365,6 +370,9 @@ describe('UI Boundary Structural Check', () => {
       'src/features/gallery/pages/GalleryDetailPage.tsx',
       'src/features/gallery/pages/GalleryCreatePage.tsx',
       'src/features/gallery/pages/GalleryEditPage.tsx',
+      'src/features/dashboard/components/DashboardPage.tsx',
+      'src/features/leads/components/LeadList.tsx',
+      'src/features/leads/components/LeadDetail.tsx',
     ];
 
     const productionFiles = import.meta.glob('../**/*.{ts,tsx}', {
