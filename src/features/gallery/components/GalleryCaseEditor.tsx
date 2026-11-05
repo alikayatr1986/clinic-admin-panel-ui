@@ -2,7 +2,24 @@ import type { GalleryPreviewState } from '../types/gallery.types';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError } from '../../../lib/api';
 import { useGalleryActions, useGalleryCase, useGalleryOptions } from '../hooks/useGallery';
-import type { GalleryCase, GalleryCaption, GalleryEdit, GalleryOptions, GalleryEditorPageProps, GalleryLocale as Locale, GalleryCaptionForm as CaptionForm, GalleryEditorForm as EditorForm, GalleryBusy as Busy, GalleryFieldErrorProps } from '../types/gallery.types';
+import type {
+  GalleryCase,
+  GalleryCaption,
+  GalleryEdit,
+  GalleryOptions,
+  GalleryEditorPageProps,
+  GalleryLocale as Locale,
+  GalleryCaptionForm as CaptionForm,
+  GalleryEditorForm as EditorForm,
+  GalleryBusy as Busy,
+  GalleryFieldErrorProps,
+} from '../types/gallery.types';
+import { Card, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 function formFromCase(item: GalleryCase): EditorForm {
   function caption(lang: Locale): CaptionForm {
@@ -219,51 +236,357 @@ export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlock
   }
 
   if (loading) return <p role="status" className="mt-8">Loading case editor…</p>;
-  if (loadError) return <div className="mt-8 rounded-xl border border-red-200 bg-white p-6"><p role="alert">{loadError}</p><button type="button" onClick={() => { void optionsQuery.refetch(); void caseQuery.refetch(); }} className="mt-4 rounded-md border border-slate-300 px-4 py-2">Retry</button></div>;
+  if (loadError)
+    return (
+      <Card className="mt-8 p-6">
+        <p role="alert">{loadError}</p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => { void optionsQuery.refetch(); void caseQuery.refetch(); }}
+          className="mt-4"
+        >
+          Retry
+        </Button>
+      </Card>
+    );
   if (!options) return null;
-  if (caseID === 'new') return <section className="mt-8 rounded-xl border border-slate-200 bg-white p-6"><h2 className="text-xl font-semibold">Create a draft case</h2><p className="mt-2 text-slate-600">A draft stays private until the clinic reviews and publishes it.</p>{error && <p role="alert" className="mt-4 text-red-800">{error}</p>}<button type="button" disabled={busy !== null} onClick={() => void createDraft()} className="mt-5 rounded-md bg-crimson px-4 py-2 font-semibold text-white">{busy ? 'Creating…' : 'Create draft'}</button></section>;
+  if (caseID === 'new')
+    return (
+      <Card className="mt-8 p-6">
+        <CardTitle className="text-xl">Create a draft case</CardTitle>
+        <CardDescription className="mt-2">
+          A draft stays private until the clinic reviews and publishes it.
+        </CardDescription>
+        {error && <p role="alert" className="mt-4 text-red-800">{error}</p>}
+        <Button
+          type="button"
+          variant="default"
+          disabled={busy !== null}
+          onClick={() => void createDraft()}
+          className="mt-5"
+        >
+          {busy ? 'Creating…' : 'Create draft'}
+        </Button>
+      </Card>
+    );
   if (!item || !form) return <p role="alert" className="mt-8">Case data is unavailable.</p>;
 
   return (
     <div className="mt-8 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="break-all text-sm text-slate-600">Case {item.id} · Revision {item.revision} · {item.published ? 'Published' : 'Unpublished'}</p>
-        <button type="button" onClick={() => onNavigate('gallery')} className="rounded-md border border-slate-300 px-4 py-2 font-medium">Back to gallery</button>
+        <p className="break-all text-sm text-slate-600">
+          Case {item.id} · Revision {item.revision} · {item.published ? 'Published' : 'Unpublished'}
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => onNavigate('gallery')}
+        >
+          Back to gallery
+        </Button>
       </div>
-      {clinicalDirty && <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-900">Saving clinical details or descriptions will unpublish this case and reset relevant approvals.</p>}
+      {clinicalDirty && (
+        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-900">
+          Saving clinical details or descriptions will unpublish this case and reset relevant approvals.
+        </p>
+      )}
       {dirty && <p role="status" className="text-sm font-medium text-amber-900">You have unsaved changes.</p>}
-      {error && <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4 text-red-900"><p>{error}</p>{Object.entries(fields).length > 0 && <ul className="mt-2 list-inside list-disc">{Object.entries(fields).map(([key, value]) => <li key={key}>{key}: {value}</li>)}</ul>}</div>}
+      {error && (
+        <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4 text-red-900">
+          <p>{error}</p>
+          {Object.entries(fields).length > 0 && (
+            <ul className="mt-2 list-inside list-disc">
+              {Object.entries(fields).map(([key, value]) => <li key={key}>{key}: {value}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
       {notice && <p role="status" className="rounded-md border border-green-200 bg-green-50 p-4 text-green-900">{notice}</p>}
 
-      <section aria-label="Combined image" className="rounded-xl border border-slate-200 bg-white p-6">
-        <h2 className="text-xl font-semibold">Combined before/after image</h2>
-        <p className="mt-2 text-sm text-slate-600">Select one combined JPEG, PNG, or WebP image. The clinic server validates and prepares it without splitting the original composition.</p>
-        {item.media_ready && item.url && !imageBroken ? <div className="relative mt-5 overflow-hidden rounded-lg bg-slate-100"><img src={item.url} alt={item.captions.find((caption) => caption.lang === 'en')?.alt_text || 'Combined before and after clinical image'} width={item.width || undefined} height={item.height || undefined} onError={() => setImageBroken(true)} className="max-h-[36rem] w-full object-contain" />{form.beforePosition && <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-8 text-sm font-semibold text-white"><span>{form.beforePosition === 'left' ? 'Before' : 'After'}</span><span>{form.beforePosition === 'right' ? 'Before' : 'After'}</span></div>}</div> : <p className="mt-5 rounded-lg bg-slate-100 p-6 text-center text-slate-600">{imageBroken ? 'Image preview unavailable.' : 'No image uploaded yet.'}</p>}
-        <div className="mt-5 flex flex-wrap items-end gap-4"><div><label htmlFor="combined-image" className="block text-sm font-medium">Combined image file</label><input ref={fileInput} id="combined-image" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy !== null} onChange={(event) => { setPendingFile(event.target.files?.[0] ?? null); setProgress(0); setError(''); }} className="mt-2 block max-w-full text-sm" /></div><button type="button" disabled={busy !== null || !pendingFile} onClick={() => void upload()} className="rounded-md border border-slate-300 px-4 py-2 font-medium">{busy === 'upload' ? 'Uploading…' : pendingFile ? 'Upload image' : 'Choose an image'}</button></div>
+      <Card aria-label="Combined image" className="p-6">
+        <CardTitle className="text-xl">Combined before/after image</CardTitle>
+        <CardDescription className="mt-2">
+          Select one combined JPEG, PNG, or WebP image. The clinic server validates and prepares it without splitting the original composition.
+        </CardDescription>
+        {item.media_ready && item.url && !imageBroken ? (
+          <div className="relative mt-5 overflow-hidden rounded-lg bg-slate-100">
+            <img
+              src={item.url}
+              alt={item.captions.find((caption) => caption.lang === 'en')?.alt_text || 'Combined before and after clinical image'}
+              width={item.width || undefined}
+              height={item.height || undefined}
+              onError={() => setImageBroken(true)}
+              className="max-h-[36rem] w-full object-contain"
+            />
+            {form.beforePosition && (
+              <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-8 text-sm font-semibold text-white">
+                <span>{form.beforePosition === 'left' ? 'Before' : 'After'}</span>
+                <span>{form.beforePosition === 'right' ? 'Before' : 'After'}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="mt-5 rounded-lg bg-slate-100 p-6 text-center text-slate-600">
+            {imageBroken ? 'Image preview unavailable.' : 'No image uploaded yet.'}
+          </p>
+        )}
+        <div className="mt-5 flex flex-wrap items-end gap-4">
+          <div>
+            <Label htmlFor="combined-image" className="block text-sm font-medium">
+              Combined image file
+            </Label>
+            <input
+              ref={fileInput}
+              id="combined-image"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={busy !== null}
+              onChange={(event) => {
+                setPendingFile(event.target.files?.[0] ?? null);
+                setProgress(0);
+                setError('');
+              }}
+              className="mt-2 block max-w-full text-sm"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy !== null || !pendingFile}
+            onClick={() => void upload()}
+          >
+            {busy === 'upload' ? 'Uploading…' : pendingFile ? 'Upload image' : 'Choose an image'}
+          </Button>
+        </div>
         {pendingFile && <p className="mt-2 text-sm">Selected: {pendingFile.name}</p>}
-        {busy === 'upload' && <div className="mt-4"><label htmlFor="upload-progress" className="block text-sm">Uploading image: {progress}%</label><progress id="upload-progress" max="100" value={progress} className="mt-2 w-full" /></div>}
-      </section>
+        {busy === 'upload' && (
+          <div className="mt-4">
+            <Label htmlFor="upload-progress" className="block text-sm">
+              Uploading image: {progress}%
+            </Label>
+            <progress id="upload-progress" max="100" value={progress} className="mt-2 w-full" />
+          </div>
+        )}
+      </Card>
 
       <form onSubmit={(event) => void save(event)} className="space-y-6">
-        <section className="rounded-xl border border-slate-200 bg-white p-6"><h2 className="text-xl font-semibold">Consent and case details</h2>
+        <Card className="p-6">
+          <CardTitle className="text-xl">Consent and case details</CardTitle>
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <div className="sm:col-span-2"><label htmlFor="signed-consent" className="block text-sm font-medium">Signed consent reference</label><input id="signed-consent" value={form.signedConsentID} onChange={(event) => updateConsentReference(event.target.value)} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2" /><FieldError name="signed_consent_id" errors={fields} /></div>
-            <label className="flex items-start gap-3 sm:col-span-2"><input type="checkbox" checked={form.consentVerified} onChange={(event) => update('consentVerified', event.target.checked)} className="mt-1" /><span>I verified this reference against the clinic-held signed permission.</span></label><FieldError name="consent_verified" errors={fields} />
-            <div><label htmlFor="procedure-tag" className="block text-sm font-medium">Procedure</label><select id="procedure-tag" value={form.procedureTag} onChange={(event) => update('procedureTag', event.target.value)} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2"><option value="">Choose procedure</option>{options.procedures.map((choice) => <option key={choice.code} value={choice.code}>{choice.en}</option>)}</select><FieldError name="procedure_tag" errors={fields} /></div>
-            <div><label htmlFor="timeframe-badge" className="block text-sm font-medium">Timeframe</label><select id="timeframe-badge" value={form.timeframeBadge} onChange={(event) => update('timeframeBadge', event.target.value)} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2"><option value="">Choose timeframe</option>{options.timeframes.map((choice) => { const isRetired = choice.retired || choice.status === 'retired'; return <option key={choice.code} value={choice.code}>{choice.en}{isRetired ? ' (Retired)' : ''}</option>; })}{form.timeframeBadge && !options.timeframes.some((choice) => choice.code === form.timeframeBadge) && <option key={form.timeframeBadge} value={form.timeframeBadge}>{form.timeframeBadge} (Retired)</option>}</select><FieldError name="timeframe_badge" errors={fields} /></div>
-            <div><label htmlFor="before-position" className="block text-sm font-medium">Before image position</label><select id="before-position" value={form.beforePosition} onChange={(event) => update('beforePosition', event.target.value as EditorForm['beforePosition'])} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2"><option value="">Choose side</option><option value="left">Left</option><option value="right">Right</option></select><FieldError name="before_position" errors={fields} /></div>
-            <div><label htmlFor="display-order" className="block text-sm font-medium">Display order</label><input id="display-order" type="number" step="1" value={form.displayOrder} onChange={(event) => update('displayOrder', event.target.value)} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2" /><FieldError name="display_order" errors={fields} /></div>
-            <label className="flex items-start gap-3 sm:col-span-2"><input type="checkbox" checked={form.cropAttested} onChange={(event) => update('cropAttested', event.target.checked)} className="mt-1" /><span>I reviewed image orientation, before/after identity, and publication suitability.</span></label><FieldError name="crop_attested" errors={fields} />
+            <div className="sm:col-span-2">
+              <Label htmlFor="signed-consent" className="block text-sm font-medium">
+                Signed consent reference
+              </Label>
+              <Input
+                id="signed-consent"
+                value={form.signedConsentID}
+                onChange={(event) => updateConsentReference(event.target.value)}
+                className="mt-2"
+              />
+              <FieldError name="signed_consent_id" errors={fields} />
+            </div>
+            <Label className="flex items-start gap-3 sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={form.consentVerified}
+                onChange={(event) => update('consentVerified', event.target.checked)}
+                className="mt-1"
+              />
+              <span>I verified this reference against the clinic-held signed permission.</span>
+            </Label>
+            <FieldError name="consent_verified" errors={fields} />
+            <div>
+              <Label htmlFor="procedure-tag" className="block text-sm font-medium">
+                Procedure
+              </Label>
+              <select
+                id="procedure-tag"
+                value={form.procedureTag}
+                onChange={(event) => update('procedureTag', event.target.value)}
+                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">Choose procedure</option>
+                {options.procedures.map((choice) => (
+                  <option key={choice.code} value={choice.code}>
+                    {choice.en}
+                  </option>
+                ))}
+              </select>
+              <FieldError name="procedure_tag" errors={fields} />
+            </div>
+            <div>
+              <Label htmlFor="timeframe-badge" className="block text-sm font-medium">
+                Timeframe
+              </Label>
+              <select
+                id="timeframe-badge"
+                value={form.timeframeBadge}
+                onChange={(event) => update('timeframeBadge', event.target.value)}
+                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">Choose timeframe</option>
+                {options.timeframes.map((choice) => {
+                  const isRetired = choice.retired || choice.status === 'retired';
+                  return (
+                    <option key={choice.code} value={choice.code}>
+                      {choice.en}
+                      {isRetired ? ' (Retired)' : ''}
+                    </option>
+                  );
+                })}
+                {form.timeframeBadge && !options.timeframes.some((choice) => choice.code === form.timeframeBadge) && (
+                  <option key={form.timeframeBadge} value={form.timeframeBadge}>
+                    {form.timeframeBadge} (Retired)
+                  </option>
+                )}
+              </select>
+              <FieldError name="timeframe_badge" errors={fields} />
+            </div>
+            <div>
+              <Label htmlFor="before-position" className="block text-sm font-medium">
+                Before image position
+              </Label>
+              <select
+                id="before-position"
+                value={form.beforePosition}
+                onChange={(event) => update('beforePosition', event.target.value as EditorForm['beforePosition'])}
+                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value="">Choose side</option>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+              </select>
+              <FieldError name="before_position" errors={fields} />
+            </div>
+            <div>
+              <Label htmlFor="display-order" className="block text-sm font-medium">
+                Display order
+              </Label>
+              <Input
+                id="display-order"
+                type="number"
+                step="1"
+                value={form.displayOrder}
+                onChange={(event) => update('displayOrder', event.target.value)}
+                className="mt-2"
+              />
+              <FieldError name="display_order" errors={fields} />
+            </div>
+            <Label className="flex items-start gap-3 sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={form.cropAttested}
+                onChange={(event) => update('cropAttested', event.target.checked)}
+                className="mt-1"
+              />
+              <span>I reviewed image orientation, before/after identity, and publication suitability.</span>
+            </Label>
+            <FieldError name="crop_attested" errors={fields} />
           </div>
-        </section>
+        </Card>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-6"><h2 className="text-xl font-semibold">Bilingual image descriptions</h2><p className="mt-2 text-sm text-slate-600">Save changed descriptions as drafts, then review and approve them in a second save before publishing.</p>
-          <div className="mt-5 grid gap-6 lg:grid-cols-2">{(['en', 'ar'] as const).map((lang) => <fieldset key={lang} className="rounded-lg border border-slate-200 p-4"><legend className="px-1 font-semibold">{lang === 'en' ? 'English' : 'Arabic'}</legend><div><label htmlFor={`${lang}-alt`} className="block text-sm font-medium">{lang.toUpperCase()} image description</label><textarea id={`${lang}-alt`} lang={lang} dir={lang === 'ar' ? 'rtl' : 'ltr'} value={form.captions[lang].altText} onChange={(event) => updateCaption(lang, 'altText', event.target.value)} rows={3} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2" /><FieldError name={`captions.${lang}.alt_text`} errors={fields} /></div><div className="mt-4"><label htmlFor={`${lang}-caption`} className="block text-sm font-medium">{lang.toUpperCase()} caption</label><textarea id={`${lang}-caption`} lang={lang} dir={lang === 'ar' ? 'rtl' : 'ltr'} value={form.captions[lang].caption} onChange={(event) => updateCaption(lang, 'caption', event.target.value)} rows={3} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2" /><FieldError name={`captions.${lang}.caption`} errors={fields} /></div><label className="mt-4 flex items-start gap-3"><input type="checkbox" checked={form.captions[lang].approved} onChange={(event) => updateCaption(lang, 'approved', event.target.checked)} className="mt-1" /><span>{lang.toUpperCase()} description reviewed and approved</span></label><FieldError name={`captions.${lang}.approval`} errors={fields} /></fieldset>)}</div>
-        </section>
-        <button type="submit" disabled={busy !== null || !formDirty} className="rounded-md bg-crimson px-5 py-2.5 font-semibold text-white">{busy === 'save' ? 'Saving…' : 'Save changes'}</button>
+        <Card className="p-6">
+          <CardTitle className="text-xl">Bilingual image descriptions</CardTitle>
+          <CardDescription className="mt-2">
+            Save changed descriptions as drafts, then review and approve them in a second save before publishing.
+          </CardDescription>
+          <div className="mt-5 grid gap-6 lg:grid-cols-2">
+            {(['en', 'ar'] as const).map((lang) => (
+              <Card key={lang} className="p-4">
+                <h3 className="font-semibold">{lang === 'en' ? 'English' : 'Arabic'}</h3>
+                <div className="mt-3">
+                  <Label htmlFor={`${lang}-alt`} className="block text-sm font-medium">
+                    {lang.toUpperCase()} image description
+                  </Label>
+                  <Textarea
+                    id={`${lang}-alt`}
+                    lang={lang}
+                    dir={lang === 'ar' ? 'rtl' : 'ltr'}
+                    value={form.captions[lang].altText}
+                    onChange={(event) => updateCaption(lang, 'altText', event.target.value)}
+                    rows={3}
+                    className="mt-2"
+                  />
+                  <FieldError name={`captions.${lang}.alt_text`} errors={fields} />
+                </div>
+                <div className="mt-4">
+                  <Label htmlFor={`${lang}-caption`} className="block text-sm font-medium">
+                    {lang.toUpperCase()} caption
+                  </Label>
+                  <Textarea
+                    id={`${lang}-caption`}
+                    lang={lang}
+                    dir={lang === 'ar' ? 'rtl' : 'ltr'}
+                    value={form.captions[lang].caption}
+                    onChange={(event) => updateCaption(lang, 'caption', event.target.value)}
+                    rows={3}
+                    className="mt-2"
+                  />
+                  <FieldError name={`captions.${lang}.caption`} errors={fields} />
+                </div>
+                <Label className="mt-4 flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={form.captions[lang].approved}
+                    onChange={(event) => updateCaption(lang, 'approved', event.target.checked)}
+                    className="mt-1"
+                  />
+                  <span>{lang.toUpperCase()} description reviewed and approved</span>
+                </Label>
+                <FieldError name={`captions.${lang}.approval`} errors={fields} />
+              </Card>
+            ))}
+          </div>
+        </Card>
+        <Button
+          type="submit"
+          variant="default"
+          disabled={busy !== null || !formDirty}
+        >
+          {busy === 'save' ? 'Saving…' : 'Save changes'}
+        </Button>
       </form>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-6"><h2 className="text-xl font-semibold">Preview and publication</h2><p className="mt-2 text-sm text-slate-600">Save all changes before previewing or changing publication. The Go server checks consent, media, language review, and current revision.</p><div className="mt-5 flex flex-wrap gap-3"><button type="button" disabled={busy !== null || dirty} onClick={() => void issuePreview()} className="rounded-md border border-slate-300 px-4 py-2 font-medium">{busy === 'preview' ? 'Preparing preview…' : 'Generate preview link'}</button><button type="button" disabled={busy !== null || dirty} onClick={() => void setPublished(!item.published)} className="rounded-md bg-crimson px-4 py-2 font-semibold text-white">{busy === 'publish' ? 'Updating…' : item.published ? 'Unpublish case' : 'Publish case'}</button></div>{preview && <p className="mt-4 rounded-md bg-slate-100 p-4"><a href={preview.url} target="_blank" rel="noopener noreferrer" className="font-medium text-crimson underline">Open private preview</a><span className="ml-2 text-sm text-slate-600">Expires {new Date(preview.expires_at).toLocaleString('en')}</span></p>}</section>
+      <Card className="p-6">
+        <CardTitle className="text-xl">Preview and publication</CardTitle>
+        <CardDescription className="mt-2">
+          Save all changes before previewing or changing publication. The Go server checks consent, media, language review, and current revision.
+        </CardDescription>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy !== null || dirty}
+            onClick={() => void issuePreview()}
+          >
+            {busy === 'preview' ? 'Preparing preview…' : 'Generate preview link'}
+          </Button>
+          <Button
+            type="button"
+            variant={item.published ? 'destructive' : 'default'}
+            disabled={busy !== null || dirty}
+            onClick={() => void setPublished(!item.published)}
+          >
+            {busy === 'publish' ? 'Updating…' : item.published ? 'Unpublish case' : 'Publish case'}
+          </Button>
+        </div>
+        {preview && (
+          <p className="mt-4 rounded-md bg-slate-100 p-4">
+            <a
+              href={preview.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-crimson underline"
+            >
+              Open private preview
+            </a>
+            <span className="ml-2 text-sm text-slate-600">
+              Expires {new Date(preview.expires_at).toLocaleString('en')}
+            </span>
+          </p>
+        )}
+      </Card>
     </div>
   );
 }

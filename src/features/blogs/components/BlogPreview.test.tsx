@@ -1,9 +1,13 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render as rtlRender, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import corpus from '../../../../../fixtures/blog-body-conformance.json';
 import { blogsApi } from '../services/blogs.service';
 import type { BlogBody as Body, BlogPreviewDetail } from '../types/blogs.types';
 import { BlogBody, BlogPreview, safeBlogHref } from './BlogPreview';
+
+function render(element: ReactElement) { const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }); const Wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>; return rtlRender(element, { wrapper: Wrapper }); }
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const article: BlogPreviewDetail = { id: 'p', slug: 'post', lang: 'ar', title: 'عنوان محفوظ', excerpt: 'ملخص', category: { key: 'ent-health', label: 'الصحة' }, first_published_at: '', last_published_at: '', reading_time_minutes: 1, author_name: 'Clinic', cover: null, body: { schema_version: 1, blocks: [{ type: 'paragraph', text: 'Saved body' }] }, references: [] };
@@ -36,7 +40,7 @@ describe('BlogPreview', () => {
   it('requests only the exact saved revision and switches one RTL tree width', async () => {
     const preview = vi.spyOn(blogsApi, 'preview').mockResolvedValue({ data: article });
     const { container } = render(<BlogPreview postID="p" locale="ar" revision={17} dirty onClose={vi.fn()} />);
-    expect(await screen.findByText(article.title)).toBeInTheDocument(); expect(preview).toHaveBeenCalledWith('p', 'ar', 17);
+    expect(await screen.findByText(article.title)).toBeInTheDocument(); expect(preview).toHaveBeenCalledWith('p', 'ar', 17, expect.anything());
     expect(screen.getByText(/unsaved edits are not included/)).toBeInTheDocument(); const tree = container.querySelector('article');
     expect(tree).toHaveAttribute('dir', 'rtl'); fireEvent.click(screen.getByRole('button', { name: 'Mobile width' }));
     expect(container.querySelector('article')).toBe(tree); expect(tree).toHaveAttribute('data-preview-width', 'mobile'); expect(container.querySelectorAll('article')).toHaveLength(1);
@@ -47,6 +51,6 @@ describe('BlogPreview', () => {
     expect(screen.getByText(/No saved revision exists/)).toBeInTheDocument(); expect(preview).not.toHaveBeenCalled();
     rerender(<BlogPreview postID="p" locale="ar" revision={8} dirty onClose={vi.fn()} />);
     expect(await screen.findByText(/Saved preview could not/)).toBeInTheDocument(); fireEvent.click(screen.getByRole('button', { name: 'Retry preview' }));
-    expect(await screen.findByText(article.title)).toBeInTheDocument(); expect(preview).toHaveBeenLastCalledWith('p', 'ar', 8);
+    expect(await screen.findByText(article.title)).toBeInTheDocument(); expect(preview).toHaveBeenLastCalledWith('p', 'ar', 8, expect.anything());
   });
 });

@@ -13,6 +13,10 @@ import type {
   GalleryParsedQuery,
   GalleryListPageProps,
 } from "../types/gallery.types";
+import { Card, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 const PAGE_SIZE = 12;
 const allowedKeys = new Set([
@@ -120,75 +124,76 @@ function CaseCard({ item, options, search, onEdit }: GalleryCardProps) {
     "missing";
   const updated = new Date(item.updated_at);
   return (
-    <li className="grid gap-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,14rem)_1fr]">
-      <CaseThumbnail item={item} />
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <h3 className="break-all text-lg font-semibold">Case {item.id}</h3>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${item.published ? "bg-green-100 text-green-900" : "bg-slate-100 text-slate-700"}`}
-          >
-            {item.published ? "Published" : "Unpublished"}
-          </span>
+    <li>
+      <Card className="grid gap-5 p-4 sm:grid-cols-[minmax(0,14rem)_1fr]">
+        <CaseThumbnail item={item} />
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <CardTitle className="break-all text-lg font-semibold">Case {item.id}</CardTitle>
+            <Badge variant={item.published ? "default" : "secondary"}>
+              {item.published ? "Published" : "Unpublished"}
+            </Badge>
+          </div>
+          <dl className="mt-4 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="font-medium text-slate-500">Procedure</dt>
+              <dd>{labelFor(item.procedure_tag, options.procedures)}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-500">Timeframe</dt>
+              <dd>{labelFor(item.timeframe_badge, options.timeframes)}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-500">Display order</dt>
+              <dd>{item.display_order}</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-500">Updated</dt>
+              <dd>
+                {Number.isNaN(updated.getTime())
+                  ? "Unknown"
+                  : updated.toLocaleString("en")}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-500">Content review</dt>
+              <dd>
+                EN: {enReview} · AR: {arReview}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-500">Visual review</dt>
+              <dd>{item.crop_attested ? "Attested" : "Pending"}</dd>
+            </div>
+          </dl>
+          {!item.before_position && item.media_ready && (
+            <p className="mt-3 text-sm text-amber-800">
+              Before/after side order not set.
+            </p>
+          )}
+          {onEdit && (
+            <Button asChild variant="outline" className="mt-4">
+              <a
+                href={`/admin/gallery/${encodeURIComponent(item.id)}?returnTo=${encodeURIComponent("/admin/gallery" + search)}`}
+                onClick={(event) => {
+                  if (
+                    !event.metaKey &&
+                    !event.ctrlKey &&
+                    !event.shiftKey &&
+                    !event.altKey &&
+                    event.button === 0
+                  ) {
+                    event.preventDefault();
+                    onEdit(item.id);
+                  }
+                }}
+              >
+                View case
+              </a>
+            </Button>
+          )}
         </div>
-        <dl className="mt-4 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="font-medium text-slate-500">Procedure</dt>
-            <dd>{labelFor(item.procedure_tag, options.procedures)}</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-slate-500">Timeframe</dt>
-            <dd>{labelFor(item.timeframe_badge, options.timeframes)}</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-slate-500">Display order</dt>
-            <dd>{item.display_order}</dd>
-          </div>
-          <div>
-            <dt className="font-medium text-slate-500">Updated</dt>
-            <dd>
-              {Number.isNaN(updated.getTime())
-                ? "Unknown"
-                : updated.toLocaleString("en")}
-            </dd>
-          </div>
-          <div>
-            <dt className="font-medium text-slate-500">Content review</dt>
-            <dd>
-              EN: {enReview} · AR: {arReview}
-            </dd>
-          </div>
-          <div>
-            <dt className="font-medium text-slate-500">Visual review</dt>
-            <dd>{item.crop_attested ? "Attested" : "Pending"}</dd>
-          </div>
-        </dl>
-        {!item.before_position && item.media_ready && (
-          <p className="mt-3 text-sm text-amber-800">
-            Before/after side order not set.
-          </p>
-        )}
-        {onEdit && (
-          <a
-            href={`/admin/gallery/${encodeURIComponent(item.id)}?returnTo=${encodeURIComponent("/admin/gallery" + search)}`}
-            onClick={(event) => {
-              if (
-                !event.metaKey &&
-                !event.ctrlKey &&
-                !event.shiftKey &&
-                !event.altKey &&
-                event.button === 0
-              ) {
-                event.preventDefault();
-                onEdit(item.id);
-              }
-            }}
-            className="mt-4 inline-block rounded-md border border-slate-300 px-4 py-2 font-medium hover:bg-slate-50"
-          >
-            View case
-          </a>
-        )}
-      </div>
+      </Card>
     </li>
   );
 }
@@ -267,29 +272,9 @@ export function GalleryCaseList({
   return (
     <section aria-label="Gallery case browser" className="mt-8">
       {onContent && (
-        <a
-          href="/admin/gallery/content"
-          onClick={(event) => {
-            if (
-              !event.metaKey &&
-              !event.ctrlKey &&
-              !event.shiftKey &&
-              !event.altKey &&
-              event.button === 0
-            ) {
-              event.preventDefault();
-              onContent();
-            }
-          }}
-          className="mb-4 inline-block rounded-md border border-slate-300 px-4 py-2 font-medium"
-        >
-          Section content
-        </a>
-      )}
-      {onCreate && (
-        <div className="mb-5 flex justify-end">
+        <Button asChild variant="outline" className="mb-4">
           <a
-            href="/admin/gallery/new"
+            href="/admin/gallery/content"
             onClick={(event) => {
               if (
                 !event.metaKey &&
@@ -299,44 +284,68 @@ export function GalleryCaseList({
                 event.button === 0
               ) {
                 event.preventDefault();
-                onCreate();
+                onContent();
               }
             }}
-            className="rounded-md bg-crimson px-4 py-2 font-semibold text-white"
           >
-            Create case
+            Section content
           </a>
+        </Button>
+      )}
+      {onCreate && (
+        <div className="mb-5 flex justify-end">
+          <Button asChild variant="default">
+            <a
+              href="/admin/gallery/new"
+              onClick={(event) => {
+                if (
+                  !event.metaKey &&
+                  !event.ctrlKey &&
+                  !event.shiftKey &&
+                  !event.altKey &&
+                  event.button === 0
+                ) {
+                  event.preventDefault();
+                  onCreate();
+                }
+              }}
+            >
+              Create case
+            </a>
+          </Button>
         </div>
       )}
       {optionsError ? (
-        <div className="rounded-xl border border-red-200 bg-white p-6">
+        <Card className="p-6">
           <p role="alert" className="text-red-800">
             {optionsError}
           </p>
-          <button
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => void optionsQuery.refetch()}
-            className="mt-4 rounded-md border border-slate-300 px-4 py-2"
+            className="mt-4"
           >
             Retry
-          </button>
-        </div>
+          </Button>
+        </Card>
       ) : !options ? (
         <p role="status">Loading gallery filters…</p>
       ) : (
         <>
-          <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <label
+              <Label
                 htmlFor="gallery-status"
                 className="block text-sm font-medium"
               >
                 Status
-              </label>
+              </Label>
               <select
                 id="gallery-status"
                 value={invalid ? "" : (parsed?.filters.status ?? "")}
                 onChange={(event) => changeFilter("status", event.target.value)}
-                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
               >
                 <option value="">All statuses</option>
                 <option value="draft">Draft</option>
@@ -345,19 +354,19 @@ export function GalleryCaseList({
               </select>
             </div>
             <div>
-              <label
+              <Label
                 htmlFor="gallery-procedure"
                 className="block text-sm font-medium"
               >
                 Procedure
-              </label>
+              </Label>
               <select
                 id="gallery-procedure"
                 value={invalid ? "" : (parsed?.filters.procedure_tag ?? "")}
                 onChange={(event) =>
                   changeFilter("procedure_tag", event.target.value)
                 }
-                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
               >
                 <option value="">All procedures</option>
                 {options.procedures.map((item) => (
@@ -368,19 +377,19 @@ export function GalleryCaseList({
               </select>
             </div>
             <div>
-              <label
+              <Label
                 htmlFor="gallery-timeframe"
                 className="block text-sm font-medium"
               >
                 Timeframe
-              </label>
+              </Label>
               <select
                 id="gallery-timeframe"
                 value={invalid ? "" : (parsed?.filters.timeframe_badge ?? "")}
                 onChange={(event) =>
                   changeFilter("timeframe_badge", event.target.value)
                 }
-                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
               >
                 <option value="">All timeframes</option>
                 {options.timeframes.map((item) => {
@@ -395,61 +404,67 @@ export function GalleryCaseList({
               </select>
             </div>
             <div className="flex items-end">
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => updateQuery(new URLSearchParams())}
-                className="w-full rounded-md border border-slate-300 px-4 py-2 font-medium hover:bg-slate-50"
+                className="w-full"
               >
                 Clear filters
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
           {invalid ? (
-            <div className="mt-6 rounded-xl border border-amber-200 bg-white p-6">
+            <Card className="mt-6 p-6">
               <p role="alert" className="text-amber-900">
                 The gallery link contains invalid filters or a page number.
                 Reset the filters to continue.
               </p>
-              <button
+              <Button
                 type="button"
+                variant="default"
                 onClick={() => updateQuery(new URLSearchParams())}
-                className="mt-4 rounded-md bg-crimson px-4 py-2 font-medium text-white"
+                className="mt-4"
               >
                 Reset filters
-              </button>
-            </div>
+              </Button>
+            </Card>
           ) : visibleResult.loading ? (
             <p role="status" className="mt-6">
               Loading gallery cases…
             </p>
           ) : visibleResult.error ? (
-            <div className="mt-6 rounded-xl border border-red-200 bg-white p-6">
+            <Card className="mt-6 p-6">
               <p role="alert" className="text-red-800">
                 {visibleResult.error}
               </p>
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => void listQuery.refetch()}
-                className="mt-4 rounded-md border border-slate-300 px-4 py-2"
+                className="mt-4"
               >
                 Retry
-              </button>
-            </div>
+              </Button>
+            </Card>
           ) : visibleResult.total === 0 ? (
-            <p className="mt-6 rounded-xl border border-slate-200 bg-white p-6 text-slate-600">
-              No gallery cases match these filters.
-            </p>
+            <Card className="mt-6 p-6">
+              <p className="text-slate-600">
+                No gallery cases match these filters.
+              </p>
+            </Card>
           ) : page > totalPages ? (
-            <div className="mt-6 rounded-xl border border-amber-200 bg-white p-6">
+            <Card className="mt-6 p-6">
               <p role="alert">This page no longer has cases.</p>
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => changePage(1)}
-                className="mt-4 rounded-md border border-slate-300 px-4 py-2"
+                className="mt-4"
               >
                 Go to first page
-              </button>
-            </div>
+              </Button>
+            </Card>
           ) : (
             <>
               <p role="status" className="mt-6 text-sm text-slate-600">
@@ -472,25 +487,25 @@ export function GalleryCaseList({
                 aria-label="Gallery pages"
                 className="mt-6 flex items-center justify-between gap-4"
               >
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   disabled={page <= 1}
                   onClick={() => changePage(page - 1)}
-                  className="rounded-md border border-slate-300 px-4 py-2 font-medium disabled:opacity-50"
                 >
                   Previous
-                </button>
+                </Button>
                 <span className="text-sm">
                   Page {page} of {totalPages}
                 </span>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   disabled={page >= totalPages}
                   onClick={() => changePage(page + 1)}
-                  className="rounded-md border border-slate-300 px-4 py-2 font-medium disabled:opacity-50"
                 >
                   Next
-                </button>
+                </Button>
               </nav>
             </>
           )}

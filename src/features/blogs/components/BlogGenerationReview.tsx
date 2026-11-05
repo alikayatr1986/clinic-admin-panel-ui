@@ -1,6 +1,10 @@
 import type { BlogGenerationReviewProps } from '../types/blogs.types';
 import { useState } from 'react';
 import type { BlogGenerationJob, BlogLocale } from '../types/blogs.types';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 
 
 
@@ -32,7 +36,7 @@ export function BlogGenerationReview({
   const selectedFields = Object.keys(selected).filter((k) => selected[k]);
 
   return (
-    <section aria-label="Generated result review" className="mt-4 rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+    <Card aria-label="Generated result review" className="mt-4 p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
         <div>
           <h3 className="text-lg font-semibold text-slate-900">Generated result (review needed)</h3>
@@ -42,9 +46,9 @@ export function BlogGenerationReview({
             </p>
           )}
         </div>
-        <span className="rounded bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900">
+        <Badge variant="outline">
           Unapproved draft
-        </span>
+        </Badge>
       </div>
 
       {locale === 'ar' && (
@@ -62,16 +66,15 @@ export function BlogGenerationReview({
       <div className="space-y-4">
         {/* Title */}
         <div className="rounded-lg border border-slate-100 p-4 bg-slate-50">
-          <label className="flex items-center gap-2 font-medium text-slate-900 cursor-pointer">
+          <Label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={Boolean(selected.title)}
               onChange={() => toggle('title')}
-              className="rounded"
               aria-label="Select title"
             />
             <span>Title</span>
-          </label>
+          </Label>
           <div className="mt-2 grid gap-3 sm:grid-cols-2 text-sm">
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">Current</p>
@@ -86,16 +89,15 @@ export function BlogGenerationReview({
 
         {/* Excerpt */}
         <div className="rounded-lg border border-slate-100 p-4 bg-slate-50">
-          <label className="flex items-center gap-2 font-medium text-slate-900 cursor-pointer">
+          <Label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={Boolean(selected.excerpt)}
               onChange={() => toggle('excerpt')}
-              className="rounded"
               aria-label="Select excerpt"
             />
             <span>Excerpt</span>
-          </label>
+          </Label>
           <div className="mt-2 grid gap-3 sm:grid-cols-2 text-sm">
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">Current</p>
@@ -110,16 +112,15 @@ export function BlogGenerationReview({
 
         {/* Body */}
         <div className="rounded-lg border border-slate-100 p-4 bg-slate-50">
-          <label className="flex items-center gap-2 font-medium text-slate-900 cursor-pointer">
+          <Label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={Boolean(selected.body)}
               onChange={() => toggle('body')}
-              className="rounded"
               aria-label="Select body"
             />
             <span>Body ({result.body.blocks.length} blocks generated)</span>
-          </label>
+          </Label>
           <div className="mt-2 text-sm">
             <div className="max-h-48 overflow-y-auto rounded border border-slate-200 bg-white p-3 space-y-2">
               {result.body.blocks.map((b, i) => (
@@ -134,16 +135,15 @@ export function BlogGenerationReview({
 
         {/* SEO Title */}
         <div className="rounded-lg border border-slate-100 p-4 bg-slate-50">
-          <label className="flex items-center gap-2 font-medium text-slate-900 cursor-pointer">
+          <Label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={Boolean(selected.seo_title)}
               onChange={() => toggle('seo_title')}
-              className="rounded"
               aria-label="Select SEO title"
             />
             <span>SEO Title</span>
-          </label>
+          </Label>
           <div className="mt-2 grid gap-3 sm:grid-cols-2 text-sm">
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">Current</p>
@@ -158,16 +158,15 @@ export function BlogGenerationReview({
 
         {/* SEO Description */}
         <div className="rounded-lg border border-slate-100 p-4 bg-slate-50">
-          <label className="flex items-center gap-2 font-medium text-slate-900 cursor-pointer">
+          <Label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={Boolean(selected.seo_description)}
               onChange={() => toggle('seo_description')}
-              className="rounded"
               aria-label="Select SEO description"
             />
             <span>SEO Description</span>
-          </label>
+          </Label>
           <div className="mt-2 grid gap-3 sm:grid-cols-2 text-sm">
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">Current</p>
@@ -190,24 +189,23 @@ export function BlogGenerationReview({
       </div>
 
       <div className="flex flex-wrap gap-3 pt-2">
-        <button
+        <Button
           type="button"
           disabled={dirty || selectedFields.length === 0 || applying || discarding}
           onClick={() => void onApply(selectedFields)}
-          className="rounded-md bg-emerald-700 px-4 py-2 font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
         >
           {applying ? 'Applying selected…' : 'Apply selected'}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="outline"
           disabled={applying || discarding}
           onClick={() => void onDiscard()}
-          className="rounded-md border border-slate-300 px-4 py-2 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
         >
           {discarding ? 'Discarding…' : 'Discard result'}
-        </button>
+        </Button>
       </div>
-    </section>
+    </Card>
   );
 }
 

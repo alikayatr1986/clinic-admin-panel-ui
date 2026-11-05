@@ -27,6 +27,22 @@ Next.js app's components, tooling, or runtime are available here.
   explicit error handling, and no duplicated business logic or speculative
   abstractions. Keep dependencies and changes proportional to the task.
 
+## State ownership and rendering
+
+- Keep transient UI state and its handlers in the smallest stable component that
+  needs them. When multiple components need to coordinate, keep a single source
+  of truth in their closest common owner.
+- Extract a section when it has a clear responsibility or isolating frequently
+  updated state reduces unnecessary work; do not split components solely to
+  reduce render counts. A custom hook alone does not isolate renders from its
+  calling component.
+- Define components outside other components and preserve intentional state and
+  draft lifetimes when moving or conditionally rendering them. Use the React
+  Profiler to investigate a slow interaction before adding memoization.
+- Keep remote server state in feature-owned TanStack Query hooks; do not mirror
+  it into local state. Local state remains appropriate for UI state such as
+  dialog visibility, selections, and unsaved form input.
+
 ## Interaction and accessibility
 
 - Design and verify the applicable default, hover, focus-visible, disabled,

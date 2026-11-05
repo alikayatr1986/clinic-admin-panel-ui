@@ -1,14 +1,29 @@
-import type { BlogGeneratorProps } from '../types/blogs.types';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { ApiError } from '../../../lib/api';
-import { useBlogEditorReads } from '../hooks/useBlogReads';
-import { useApplyBlogGeneration, useCancelBlogGeneration, useDiscardBlogGeneration, useQueueBlogGeneration } from '../hooks/useBlogMutations';
-import type { BlogGenerationBrief, BlogGenerationJob, BlogGenerationSource, BlogLocale } from '../types/blogs.types';
-import { BlogGenerationReview } from './BlogGenerationReview';
+import type { BlogGeneratorProps } from "../types/blogs.types";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ApiError } from "../../../lib/api";
+import { useBlogEditorReads } from "../hooks/useBlogReads";
+import {
+  useApplyBlogGeneration,
+  useCancelBlogGeneration,
+  useDiscardBlogGeneration,
+  useQueueBlogGeneration,
+} from "../hooks/useBlogMutations";
+import type {
+  BlogGenerationBrief,
+  BlogGenerationJob,
+  BlogGenerationSource,
+  BlogLocale,
+} from "../types/blogs.types";
+import { BlogGenerationReview } from "./BlogGenerationReview";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
-
-
-const storageKey = (postID: string, locale: string) => `blog_gen_job_${postID}_${locale}`;
+const storageKey = (postID: string, locale: string) =>
+  `blog_gen_job_${postID}_${locale}`;
 
 export function BlogGenerator({
   postID,
@@ -20,11 +35,13 @@ export function BlogGenerator({
   onApplied,
 }: BlogGeneratorProps) {
   // Brief inputs
-  const [topic, setTopic] = useState('');
-  const [audience, setAudience] = useState('');
-  const [instructions, setInstructions] = useState('');
-  const [targetLength, setTargetLength] = useState<number | undefined>(undefined);
-  const [clinicFacts, setClinicFacts] = useState('');
+  const [topic, setTopic] = useState("");
+  const [audience, setAudience] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [targetLength, setTargetLength] = useState<number | undefined>(
+    undefined,
+  );
+  const [clinicFacts, setClinicFacts] = useState("");
   const [sources, setSources] = useState<BlogGenerationSource[]>([]);
   const [confirmedNoPatientData, setConfirmedNoPatientData] = useState(false);
 
@@ -34,9 +51,9 @@ export function BlogGenerator({
   const [canceling, setCanceling] = useState(false);
   const [applying, setApplying] = useState(false);
   const [discarding, setDiscarding] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState("");
 
   const pollCount = useRef(0);
   const maxPolls = 48; // ~120s with 2.5s interval
@@ -48,7 +65,7 @@ export function BlogGenerator({
 
   // Reopen persisted job from localStorage on mount or locale change
   useEffect(() => {
-    setError('');
+    setError("");
     setFieldErrors({});
     const savedJobID = localStorage.getItem(storageKey(postID, locale));
     if (!savedJobID) {
@@ -60,7 +77,7 @@ export function BlogGenerator({
     loadGeneration(postID, savedJobID)
       .then((j) => {
         if (!active) return;
-        if (j.status === 'applied' || j.status === 'discarded') {
+        if (j.status === "applied" || j.status === "discarded") {
           localStorage.removeItem(storageKey(postID, locale));
           setJob(null);
         } else {
@@ -80,29 +97,33 @@ export function BlogGenerator({
 
   // Bounded polling while queued or running
   useEffect(() => {
-    if (!job || (job.status !== 'queued' && job.status !== 'running')) return;
+    if (!job || (job.status !== "queued" && job.status !== "running")) return;
 
     pollCount.current = 0;
     const interval = setInterval(async () => {
       pollCount.current += 1;
       if (pollCount.current > maxPolls) {
         clearInterval(interval);
-        setError('Generation timed out polling. Please check job status or retry.');
+        setError(
+          "Generation timed out polling. Please check job status or retry.",
+        );
         return;
       }
       try {
         const updated = await loadGeneration(postID, job.id);
         setJob(updated);
-        if (updated.status !== 'queued' && updated.status !== 'running') {
+        if (updated.status !== "queued" && updated.status !== "running") {
           clearInterval(interval);
-          if (updated.status === 'applied' || updated.status === 'discarded') {
+          if (updated.status === "applied" || updated.status === "discarded") {
             localStorage.removeItem(storageKey(postID, locale));
           }
         }
       } catch (err) {
         clearInterval(interval);
         if (err instanceof ApiError && err.status === 401) {
-          setError('Session expired while checking generation progress. Please sign in again.');
+          setError(
+            "Session expired while checking generation progress. Please sign in again.",
+          );
         }
       }
     }, 2500);
@@ -114,12 +135,19 @@ export function BlogGenerator({
     if (sources.length >= 10) return;
     setSources((prev) => [
       ...prev,
-      { source_id: `src-${prev.length + 1}`, text: '', citation_label: '', citation_url: '' },
+      {
+        source_id: `src-${prev.length + 1}`,
+        text: "",
+        citation_label: "",
+        citation_url: "",
+      },
     ]);
   }
 
   function updateSource(index: number, patch: Partial<BlogGenerationSource>) {
-    setSources((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+    setSources((prev) =>
+      prev.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+    );
   }
 
   function removeSource(index: number) {
@@ -128,42 +156,51 @@ export function BlogGenerator({
 
   async function handleStart(e: FormEvent) {
     e.preventDefault();
-    setError('');
+    setError("");
     setFieldErrors({});
-    setNotice('');
+    setNotice("");
 
     // Client-side length & URL checks
     const errors: Record<string, string> = {};
-    if (!topic.trim()) errors.topic = 'Topic is required.';
-    else if (topic.length > 300) errors.topic = 'Topic must be ≤ 300 characters.';
+    if (!topic.trim()) errors.topic = "Topic is required.";
+    else if (topic.length > 300)
+      errors.topic = "Topic must be ≤ 300 characters.";
 
-    if (audience && audience.length > 500) errors.audience = 'Audience must be ≤ 500 characters.';
-    if (!instructions.trim()) errors.instructions = 'Instructions are required.';
-    else if (instructions.length > 2000) errors.instructions = 'Instructions must be ≤ 2,000 characters.';
+    if (audience && audience.length > 500)
+      errors.audience = "Audience must be ≤ 500 characters.";
+    if (!instructions.trim())
+      errors.instructions = "Instructions are required.";
+    else if (instructions.length > 2000)
+      errors.instructions = "Instructions must be ≤ 2,000 characters.";
 
     if (targetLength && (targetLength < 400 || targetLength > 1500)) {
-      errors.target_length = 'Target length must be between 400 and 1,500 words.';
+      errors.target_length =
+        "Target length must be between 400 and 1,500 words.";
     }
     if (clinicFacts && clinicFacts.length > 20000) {
-      errors.clinic_facts = 'Clinic facts must be ≤ 20,000 characters.';
+      errors.clinic_facts = "Clinic facts must be ≤ 20,000 characters.";
     }
 
     let sourceChars = 0;
     sources.forEach((s, i) => {
       sourceChars += s.text.length;
-      if (!s.source_id.trim()) errors[`source_${i}_id`] = 'Source ID is required.';
-      if (!s.text.trim()) errors[`source_${i}_text`] = 'Source excerpt text is required.';
-      if (!s.citation_label.trim()) errors[`source_${i}_label`] = 'Citation label is required.';
-      if (s.citation_url && !s.citation_url.startsWith('https://')) {
-        errors[`source_${i}_url`] = 'Citation URL must use HTTPS.';
+      if (!s.source_id.trim())
+        errors[`source_${i}_id`] = "Source ID is required.";
+      if (!s.text.trim())
+        errors[`source_${i}_text`] = "Source excerpt text is required.";
+      if (!s.citation_label.trim())
+        errors[`source_${i}_label`] = "Citation label is required.";
+      if (s.citation_url && !s.citation_url.startsWith("https://")) {
+        errors[`source_${i}_url`] = "Citation URL must use HTTPS.";
       }
     });
     if (sourceChars > 20000) {
-      errors.sources = 'Total source excerpts must be ≤ 20,000 characters.';
+      errors.sources = "Total source excerpts must be ≤ 20,000 characters.";
     }
 
     if (!confirmedNoPatientData) {
-      errors.confirmation = 'You must confirm that no patient data is included.';
+      errors.confirmation =
+        "You must confirm that no patient data is included.";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -178,7 +215,9 @@ export function BlogGenerator({
         source_id: s.source_id.trim(),
         text: s.text.trim(),
         citation_label: s.citation_label.trim(),
-        ...(s.citation_url?.trim() ? { citation_url: s.citation_url.trim() } : {}),
+        ...(s.citation_url?.trim()
+          ? { citation_url: s.citation_url.trim() }
+          : {}),
       })),
       ...(audience.trim() ? { audience: audience.trim() } : {}),
       ...(targetLength ? { target_length: targetLength } : {}),
@@ -187,7 +226,7 @@ export function BlogGenerator({
 
     setStarting(true);
     const idempotencyKey =
-      typeof crypto !== 'undefined' && crypto.randomUUID
+      typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
         : `gen-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
@@ -204,16 +243,21 @@ export function BlogGenerator({
       setNotice(`Generation job queued for ${locale.toUpperCase()}.`);
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.code === 'BLOG_BUDGET_EXHAUSTED' || err.status === 422) {
-          setError(err.message || 'Daily AI generation budget reached. Try again tomorrow or edit manually.');
+        if (err.code === "BLOG_BUDGET_EXHAUSTED" || err.status === 422) {
+          setError(
+            err.message ||
+              "Daily AI generation budget reached. Try again tomorrow or edit manually.",
+          );
         } else if (err.status === 409) {
-          setError('A generation job is already active for this post/locale, or aggregate limit reached.');
+          setError(
+            "A generation job is already active for this post/locale, or aggregate limit reached.",
+          );
         } else {
           setError(err.message);
         }
         if (err.fields) setFieldErrors(err.fields);
       } else {
-        setError('Failed to start generation. Manual text is preserved.');
+        setError("Failed to start generation. Manual text is preserved.");
       }
     } finally {
       setStarting(false);
@@ -223,13 +267,13 @@ export function BlogGenerator({
   async function handleCancel() {
     if (!job || canceling) return;
     setCanceling(true);
-    setError('');
+    setError("");
     try {
       await cancelGeneration.mutateAsync({ id: postID, jobID: job.id });
-      setJob((prev) => (prev ? { ...prev, status: 'canceled' } : null));
+      setJob((prev) => (prev ? { ...prev, status: "canceled" } : null));
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
-      else setError('Failed to cancel generation job.');
+      else setError("Failed to cancel generation job.");
     } finally {
       setCanceling(false);
     }
@@ -238,15 +282,15 @@ export function BlogGenerator({
   async function handleDiscard() {
     if (!job || discarding) return;
     setDiscarding(true);
-    setError('');
+    setError("");
     try {
       await discardGeneration.mutateAsync({ id: postID, jobID: job.id });
       localStorage.removeItem(storageKey(postID, locale));
       setJob(null);
-      setNotice('Generation result discarded.');
+      setNotice("Generation result discarded.");
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
-      else setError('Failed to discard generation result.');
+      else setError("Failed to discard generation result.");
     } finally {
       setDiscarding(false);
     }
@@ -255,22 +299,32 @@ export function BlogGenerator({
   async function handleApply(selectedFields: string[]) {
     if (!job || applying) return;
     setApplying(true);
-    setError('');
+    setError("");
     try {
-      await applyGeneration.mutateAsync({ id: postID, jobID: job.id, selectedFields });
+      await applyGeneration.mutateAsync({
+        id: postID,
+        jobID: job.id,
+        selectedFields,
+      });
       localStorage.removeItem(storageKey(postID, locale));
       setJob(null);
       await onRefresh();
-      onApplied?.(`Applied generated ${selectedFields.join(', ')} as assisted draft.`);
+      onApplied?.(
+        `Applied generated ${selectedFields.join(", ")} as assisted draft.`,
+      );
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 409) {
-          setError('Draft changed on server. Please refresh latest revision and retry.');
+          setError(
+            "Draft changed on server. Please refresh latest revision and retry.",
+          );
         } else {
           setError(err.message);
         }
       } else {
-        setError('Failed to apply generated draft. Your current draft text is untouched.');
+        setError(
+          "Failed to apply generated draft. Your current draft text is untouched.",
+        );
       }
     } finally {
       setApplying(false);
@@ -278,57 +332,78 @@ export function BlogGenerator({
   }
 
   return (
-    <section aria-label="AI drafting" className="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+    <Card aria-label="AI drafting" className="p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">AI drafting for {locale.toUpperCase()}</h2>
+          <h2 className="text-xl font-semibold text-slate-900">
+            AI drafting for {locale.toUpperCase()}
+          </h2>
           <p className="text-xs text-slate-500">
-            Assisted drafts are grounded in supplied sources and require review before publication.
+            Assisted drafts are grounded in supplied sources and require review
+            before publication.
           </p>
         </div>
         {job && (
           <div className="flex items-center gap-2">
-            <span
-              className={`rounded px-2.5 py-1 text-xs font-semibold ${
-                job.status === 'succeeded'
-                  ? 'bg-emerald-100 text-emerald-900'
-                  : job.status === 'failed' || job.status === 'canceled'
-                  ? 'bg-rose-100 text-rose-900'
-                  : 'bg-blue-100 text-blue-900'
-              }`}
+            <Badge
+              variant={
+                job.status === "succeeded"
+                  ? "secondary"
+                  : job.status === "failed" || job.status === "canceled"
+                    ? "destructive"
+                    : "outline"
+              }
             >
               Status: {job.status}
-            </span>
+            </Badge>
           </div>
         )}
       </div>
 
-      {notice && <p role="status" className="rounded-md bg-green-50 p-3 text-sm text-green-900">{notice}</p>}
-      {error && <div role="alert" className="rounded-md bg-red-50 p-4 text-sm text-red-900"><p>{error}</p></div>}
+      {notice && (
+        <p
+          role="status"
+          className="rounded-md bg-green-50 p-3 text-sm text-green-900"
+        >
+          {notice}
+        </p>
+      )}
+      {error && (
+        <div
+          role="alert"
+          className="rounded-md bg-red-50 p-4 text-sm text-red-900"
+        >
+          <p>{error}</p>
+        </div>
+      )}
 
       {/* Active Job Status / Review view */}
-      {job && (job.status === 'queued' || job.status === 'running') && (
+      {job && (job.status === "queued" || job.status === "running") && (
         <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-blue-900">
-              {job.status === 'queued' ? 'Job queued, waiting for worker…' : 'Generating article draft with AI provider…'}
+              {job.status === "queued"
+                ? "Job queued, waiting for worker…"
+                : "Generating article draft with AI provider…"}
             </p>
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               disabled={canceling}
               onClick={() => void handleCancel()}
-              className="rounded border border-blue-300 bg-white px-3 py-1.5 text-xs font-medium text-blue-800 hover:bg-blue-50"
             >
-              {canceling ? 'Canceling…' : 'Cancel job'}
-            </button>
+              {canceling ? "Canceling…" : "Cancel job"}
+            </Button>
           </div>
           <p className="text-xs text-blue-700">
-            You can safely navigate away. The job runs in the background and will be restored when reopening this article.
+            You can safely navigate away. The job runs in the background and
+            will be restored when reopening this article.
           </p>
         </div>
       )}
 
-      {job && job.status === 'succeeded' && (
+      {job && job.status === "succeeded" && (
         <BlogGenerationReview
           job={job}
           currentDraft={currentDraft}
@@ -341,60 +416,77 @@ export function BlogGenerator({
         />
       )}
 
-      {job && (job.status === 'failed' || job.status === 'canceled') && (
+      {job && (job.status === "failed" || job.status === "canceled") && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 space-y-2">
           <p className="text-sm font-medium text-rose-900">
-            Generation {job.status}: {job.error_category || 'request did not complete'}.
+            Generation {job.status}:{" "}
+            {job.error_category || "request did not complete"}.
           </p>
           <div className="flex gap-3 pt-1">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => {
                 localStorage.removeItem(storageKey(postID, locale));
                 setJob(null);
               }}
-              className="rounded border border-rose-300 bg-white px-3 py-1.5 text-xs font-medium text-rose-800 hover:bg-rose-50"
             >
               Start new generation brief
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {/* Generation Brief Form — visible when no job, or after completion/failure */}
-      {(!job || job.status === 'failed' || job.status === 'canceled') && (
+      {(!job || job.status === "failed" || job.status === "canceled") && (
         <form onSubmit={handleStart} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block sm:col-span-2">
-              <span className="text-sm font-medium text-slate-800">Topic *</span>
-              <input
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="blog-gen-topic">Topic *</Label>
+              <Input
+                id="blog-gen-topic"
                 value={topic}
                 maxLength={300}
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="e.g. Rhinoplasty recovery timeline and expectations"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               />
-              {fieldErrors.topic && <p className="mt-1 text-xs text-rose-600">{fieldErrors.topic}</p>}
-            </label>
+              {fieldErrors.topic && (
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.topic}
+                </p>
+              )}
+            </div>
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-800">Audience</span>
-              <input
+            <div className="space-y-1.5">
+              <Label htmlFor="blog-gen-audience">Audience</Label>
+              <Input
+                id="blog-gen-audience"
                 value={audience}
                 maxLength={500}
                 onChange={(e) => setAudience(e.target.value)}
                 placeholder="e.g. Prospective international patients considering rhinoplasty"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               />
-              {fieldErrors.audience && <p className="mt-1 text-xs text-rose-600">{fieldErrors.audience}</p>}
-            </label>
+              {fieldErrors.audience && (
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.audience}
+                </p>
+              )}
+            </div>
 
-            <label className="block">
-              <span className="text-sm font-medium text-slate-800">Target length (words)</span>
+            <div className="space-y-1.5">
+              <Label htmlFor="blog-gen-target-length">
+                Target length (words)
+              </Label>
               <select
-                value={targetLength ?? ''}
-                onChange={(e) => setTargetLength(e.target.value ? Number(e.target.value) : undefined)}
-                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+                id="blog-gen-target-length"
+                value={targetLength ?? ""}
+                onChange={(e) =>
+                  setTargetLength(
+                    e.target.value ? Number(e.target.value) : undefined,
+                  )
+                }
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <option value="">Default (balanced)</option>
                 <option value="500">Short (500 words)</option>
@@ -402,34 +494,50 @@ export function BlogGenerator({
                 <option value="1200">Long (1,200 words)</option>
                 <option value="1500">Comprehensive (1,500 words)</option>
               </select>
-              {fieldErrors.target_length && <p className="mt-1 text-xs text-rose-600">{fieldErrors.target_length}</p>}
-            </label>
+              {fieldErrors.target_length && (
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.target_length}
+                </p>
+              )}
+            </div>
 
-            <label className="block sm:col-span-2">
-              <span className="text-sm font-medium text-slate-800">Editorial instructions *</span>
-              <textarea
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="blog-gen-instructions">
+                Editorial instructions *
+              </Label>
+              <Textarea
+                id="blog-gen-instructions"
                 value={instructions}
                 maxLength={2000}
                 rows={3}
                 onChange={(e) => setInstructions(e.target.value)}
                 placeholder="Specific guidance for style, headings, and key points to emphasize"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               />
-              {fieldErrors.instructions && <p className="mt-1 text-xs text-rose-600">{fieldErrors.instructions}</p>}
-            </label>
+              {fieldErrors.instructions && (
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.instructions}
+                </p>
+              )}
+            </div>
 
-            <label className="block sm:col-span-2">
-              <span className="text-sm font-medium text-slate-800">Approved clinic facts</span>
-              <textarea
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="blog-gen-clinic-facts">
+                Approved clinic facts
+              </Label>
+              <Textarea
+                id="blog-gen-clinic-facts"
                 value={clinicFacts}
                 maxLength={20000}
                 rows={2}
                 onChange={(e) => setClinicFacts(e.target.value)}
                 placeholder="Doctor credentials, facility certifications, or authorized procedures"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
               />
-              {fieldErrors.clinic_facts && <p className="mt-1 text-xs text-rose-600">{fieldErrors.clinic_facts}</p>}
-            </label>
+              {fieldErrors.clinic_facts && (
+                <p className="mt-1 text-xs text-rose-600">
+                  {fieldErrors.clinic_facts}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Source excerpts */}
@@ -439,57 +547,67 @@ export function BlogGenerator({
                 Source excerpts ({sources.length}/10)
               </span>
               {sources.length < 10 && (
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={addSource}
-                  className="rounded border border-slate-300 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
                   + Add source excerpt
-                </button>
+                </Button>
               )}
             </div>
 
             {sources.map((src, i) => (
-              <div key={i} className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+              <div
+                key={i}
+                className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2"
+              >
                 <div className="grid gap-2 sm:grid-cols-3">
-                  <input
+                  <Input
                     aria-label={`Source ID ${i + 1}`}
                     placeholder="Source ID (e.g. src-dr-study)"
                     value={src.source_id}
-                    onChange={(e) => updateSource(i, { source_id: e.target.value })}
-                    className="rounded border px-2 py-1 text-xs"
+                    onChange={(e) =>
+                      updateSource(i, { source_id: e.target.value })
+                    }
                   />
-                  <input
+                  <Input
                     aria-label={`Citation label ${i + 1}`}
                     placeholder="Citation label (e.g. Clinical Study 2024)"
                     value={src.citation_label}
-                    onChange={(e) => updateSource(i, { citation_label: e.target.value })}
-                    className="rounded border px-2 py-1 text-xs sm:col-span-2"
+                    onChange={(e) =>
+                      updateSource(i, { citation_label: e.target.value })
+                    }
+                    className="sm:col-span-2"
                   />
                 </div>
-                <textarea
+                <Textarea
                   aria-label={`Source text ${i + 1}`}
                   placeholder="Approved excerpt text for the model to ground its writing"
                   value={src.text}
                   rows={2}
                   onChange={(e) => updateSource(i, { text: e.target.value })}
-                  className="w-full rounded border px-2 py-1 text-xs"
+                  className="w-full"
                 />
                 <div className="flex items-center justify-between gap-2">
-                  <input
+                  <Input
                     aria-label={`Citation URL ${i + 1}`}
                     placeholder="https://... (optional)"
-                    value={src.citation_url ?? ''}
-                    onChange={(e) => updateSource(i, { citation_url: e.target.value })}
-                    className="flex-1 rounded border px-2 py-1 text-xs"
+                    value={src.citation_url ?? ""}
+                    onChange={(e) =>
+                      updateSource(i, { citation_url: e.target.value })
+                    }
+                    className="flex-1"
                   />
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => removeSource(i)}
-                    className="text-xs text-rose-700 hover:underline"
                   >
                     Remove
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -497,33 +615,33 @@ export function BlogGenerator({
 
           {/* Privacy confirmation */}
           <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-            <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slate-700">
+            <Label className="flex items-start gap-2.5 cursor-pointer text-xs font-normal">
               <input
                 type="checkbox"
                 checked={confirmedNoPatientData}
                 onChange={(e) => setConfirmedNoPatientData(e.target.checked)}
-                className="mt-0.5 rounded border-slate-300"
+                className="mt-0.5"
               />
               <span>
-                <strong>No patient data:</strong> I confirm this brief contains no patient records, clinical photographs,
-                personal contact details, or private consultation transcripts.
+                <strong>No patient data:</strong> I confirm this brief contains
+                no patient records, clinical photographs, personal contact
+                details, or private consultation transcripts.
               </span>
-            </label>
+            </Label>
             {fieldErrors.confirmation && (
-              <p className="mt-1 text-xs text-rose-600">{fieldErrors.confirmation}</p>
+              <p className="mt-1 text-xs text-rose-600">
+                {fieldErrors.confirmation}
+              </p>
             )}
           </div>
 
-          <button
-            type="submit"
-            disabled={starting || !confirmedNoPatientData}
-            className="rounded-md bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50"
-          >
-            {starting ? 'Starting generation…' : `Start AI drafting for ${locale.toUpperCase()}`}
-          </button>
+          <Button type="submit" disabled={starting || !confirmedNoPatientData}>
+            {starting
+              ? "Starting generation…"
+              : `Start AI drafting for ${locale.toUpperCase()}`}
+          </Button>
         </form>
       )}
-    </section>
+    </Card>
   );
 }
-

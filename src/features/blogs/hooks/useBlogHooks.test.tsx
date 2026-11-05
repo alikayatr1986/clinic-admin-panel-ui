@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { useBlogOptions } from './useBlogOptions';
 import { useBlogList } from './useBlogList';
+import { useBlogHome, useBlogPreview } from './useBlogReads';
 import { blogsApi } from '../services/blogs.service';
 import { ApiError } from '../../../lib/api';
 
@@ -70,5 +71,35 @@ describe('useBlogOptions and useBlogList hooks', () => {
 
     await waitFor(() => expect(errResult.current.isError).toBe(true));
     expect(onExpired).toHaveBeenCalledOnce();
+  });
+});
+
+describe('blog saved reads', () => {
+  it('useBlogPreview reads the exact saved revision and surfaces a failed read', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const preview = vi.spyOn(blogsApi, 'preview').mockResolvedValue({
+      data: {
+        id: 'post-1', slug: 'post', lang: 'ar', title: 'Saved', excerpt: '', author_name: '',
+        category: { key: 'ent-health', label: 'Health' }, body: { schema_version: 1, blocks: [] },
+        references: [], cover: null, first_published_at: '', last_published_at: '', reading_time_minutes: 1,
+      },
+    });
+
+    const { result } = renderHook(() => useBlogPreview('post-1', 'ar', 4), { wrapper: wrapper(client) });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.title).toBe('Saved');
+    expect(preview).toHaveBeenCalledWith('post-1', 'ar', 4, expect.anything());
+
+    vi.spyOn(blogsApi, 'preview').mockRejectedValueOnce(new ApiError(500, 'FAILURE', 'Broken'));
+    const { result: failed } = renderHook(() => useBlogPreview('post-1', 'ar', 5), { wrapper: wrapper(new QueryClient({ defaultOptions: { queries: { retry: false } } })) });
+    await waitFor(() => expect(failed.current.isError).toBe(true));
+  });
+
+  it('useBlogHome loads home settings without caching stale data', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.spyOn(blogsApi, 'home').mockResolvedValue({ data: { featured_post_id: 'post-1', revision: 2, updated_at: '' } });
+    const { result } = renderHook(() => useBlogHome(), { wrapper: wrapper(client) });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.featured_post_id).toBe('post-1');
   });
 });

@@ -1,5 +1,6 @@
 import { BlogList } from '../components/BlogList';
 import type { BlogListPageProps } from '../types/blogs.types';
+import { Button } from '@/components/ui/button';
 
 export function BlogListPage({ onExpired, onEdit, onCreate }: BlogListPageProps) {
   return (
@@ -11,13 +12,12 @@ export function BlogListPage({ onExpired, onEdit, onCreate }: BlogListPageProps)
             Browse, filter, and review bilingual medical articles.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={onCreate}
-          className="rounded-md bg-crimson px-4 py-2 text-sm font-semibold text-white hover:opacity-90 transition-opacity"
         >
           Create article
-        </button>
+        </Button>
       </div>
 
       <BlogList onExpired={onExpired} onEdit={onEdit} embeddedCreate={false} />

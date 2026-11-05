@@ -31,8 +31,11 @@ describe('BlogPublishPanel', () => {
     const publish = vi.spyOn(blogsApi, 'publish').mockReturnValue(new Promise((done) => { resolve = done; })); const { refresh } = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Publish update' })); expect(publish).not.toHaveBeenCalled(); const summary = screen.getByRole('dialog', { name: 'Publish summary' }); expect(summary).toHaveTextContent('ent-health'); expect(summary).toHaveTextContent('Saved title · revision 8'); expect(summary).toHaveTextContent('عنوان محفوظ · revision 9'); expect(summary).toHaveTextContent('alt: cover');
     const button = screen.getByRole('button', { name: 'Confirm publish' }); expect(button).toHaveFocus(); fireEvent.click(button); fireEvent.click(button);
-    expect(publish).toHaveBeenCalledOnce(); expect(publish).toHaveBeenCalledWith('p', { expected_aggregate_revision: 20, category_id: 'cat', en_revision_id: 'en-uuid', ar_revision_id: 'ar-uuid' });
+    await waitFor(() => expect(publish).toHaveBeenCalledOnce()); expect(publish).toHaveBeenCalledWith('p', { expected_aggregate_revision: 20, category_id: 'cat', en_revision_id: 'en-uuid', ar_revision_id: 'ar-uuid' });
     expect(screen.queryByText(/Publication succeeded/)).not.toBeInTheDocument(); expect(refresh).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Publish summary' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Publish summary' }), { key: 'Escape' });
+    expect(screen.getByRole('dialog', { name: 'Publish summary' })).toBeInTheDocument();
     resolve({ data: { publication_id: 'new-live', aggregate_revision: 21, first_published_at: '', last_published_at: '' } });
     expect(await screen.findByText(/Publication succeeded/)).toBeInTheDocument(); await waitFor(() => expect(refresh).toHaveBeenCalled());
   });

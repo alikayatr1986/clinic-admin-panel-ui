@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { blogsApi } from '../services/blogs.service';
-import type { BlogBodyMark, BlogPreviewDetail, BlogBodyProps, BlogPreviewProps } from '../types/blogs.types';
+import { useBlogPreview } from '../hooks/useBlogReads';
+import type { BlogBodyMark, BlogBodyProps, BlogPreviewProps } from '../types/blogs.types';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 export function safeBlogHref(value: string): boolean {
   if (!value || /[\\\s\u0000-\u001f\u007f]/u.test(value)) return false;
@@ -44,23 +46,59 @@ export function BlogBody({ body }: BlogBodyProps) {
 }
 
 export function BlogPreview({ postID, locale, revision, dirty, onClose }: BlogPreviewProps) {
-  const region = useRef<HTMLElement>(null);
+  const region = useRef<HTMLDivElement>(null);
   useEffect(() => { region.current?.focus(); }, []);
-  const [article, setArticle] = useState<BlogPreviewDetail | null>(null); const [error, setError] = useState(''); const [attempt, setAttempt] = useState(0); const [mobile, setMobile] = useState(false);
-  useEffect(() => {
-    let active = true; setArticle(null); setError('');
-    if (!revision) { setError('No saved revision exists for this edition. Save it before previewing.'); return; }
-    blogsApi.preview(postID, locale, revision).then(({ data }) => { if (active) setArticle(data); }).catch(() => { if (active) setError('Saved preview could not be loaded. Your editor text remains available. Sign in again if your session expired, then retry.'); });
-    return () => { active = false; };
-  }, [postID, locale, revision, attempt]);
-  return <section ref={region} tabIndex={-1} aria-label="Saved article preview" className="space-y-4 rounded-xl border bg-white p-4">
-    <div className="flex flex-wrap gap-3"><p>Private preview · {locale.toUpperCase()} · Saved revision {revision ?? 'unavailable'} · Non-public</p><button onClick={onClose} className="min-h-12 rounded border px-3">Return to editor</button><button aria-pressed={!mobile} onClick={() => setMobile(false)} className="min-h-12 rounded border px-3">Desktop width</button><button aria-pressed={mobile} onClick={() => setMobile(true)} className="min-h-12 rounded border px-3">Mobile width</button></div>
+  const preview = useBlogPreview(postID, locale, revision);
+  const article = preview.data ?? null;
+  const [mobile, setMobile] = useState(false);
+  const error = !revision
+    ? 'No saved revision exists for this edition. Save it before previewing.'
+    : preview.isError
+      ? 'Saved preview could not be loaded. Your editor text remains available. Sign in again if your session expired, then retry.'
+      : '';
+  return <Card ref={region} role="region" tabIndex={-1} aria-label="Saved article preview" className="space-y-4 p-4">
+    <div className="flex flex-wrap gap-3">
+      <p>Private preview · {locale.toUpperCase()} · Saved revision {revision ?? 'unavailable'} · Non-public</p>
+      <Button variant="outline" onClick={onClose}>Return to editor</Button>
+      <Button variant={!mobile ? 'default' : 'outline'} aria-pressed={!mobile} onClick={() => setMobile(false)}>Desktop width</Button>
+      <Button variant={mobile ? 'default' : 'outline'} aria-pressed={mobile} onClick={() => setMobile(true)}>Mobile width</Button>
+    </div>
     {dirty && <p role="status">Preview shows saved revision {revision ?? 'unavailable'}; unsaved edits are not included.</p>}
-    {error ? <div role="alert"><p>{error}</p><button onClick={() => setAttempt((v) => v + 1)} className="min-h-12 underline">Retry preview</button></div> : !article ? <p role="status">Loading saved preview…</p> : <article lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'} data-preview-width={mobile ? 'mobile' : 'desktop'} className={`mx-auto w-full space-y-5 break-words ${mobile ? 'max-w-[375px]' : 'max-w-4xl'}`}>
-      <p>{article.category.label}</p><h2 className="text-3xl font-semibold">{article.title}</h2><p>{article.excerpt}</p><p>{article.author_name}{article.reviewer_attribution && ` · ${article.reviewer_attribution}`} · {article.reading_time_minutes} min</p>
-      {article.first_published_at && <p>First published: {new Date(article.first_published_at).toLocaleDateString(locale)}{article.last_published_at !== article.first_published_at && article.last_published_at && ` · Updated: ${new Date(article.last_published_at).toLocaleDateString(locale)}`}</p>}
-      {article.cover && <img src={article.cover.url} alt={article.cover.alt} width={article.cover.width} height={article.cover.height} referrerPolicy="no-referrer" className="h-auto w-full" />}
-      <BlogBody body={article.body} />{article.references.length > 0 && <section><h3>References</h3><ul>{article.references.map((ref, i) => <li key={i}>{safeBlogHref(ref.url) ? <a href={ref.url} target="_blank" rel="noreferrer noopener" className="break-all underline">{ref.label}</a> : ref.label}</li>)}</ul></section>}
-    </article>}
-  </section>;
+    {error ? (
+      <div role="alert">
+        <p>{error}</p>
+        <Button variant="link" onClick={() => void preview.refetch()}>Retry preview</Button>
+      </div>
+    ) : !article ? (
+      <p role="status">Loading saved preview…</p>
+    ) : (
+      <article lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'} data-preview-width={mobile ? 'mobile' : 'desktop'} className={`mx-auto w-full space-y-5 break-words ${mobile ? 'max-w-[375px]' : 'max-w-4xl'}`}>
+        <p>{article.category.label}</p>
+        <h2 className="text-3xl font-semibold">{article.title}</h2>
+        <p>{article.excerpt}</p>
+        <p>{article.author_name}{article.reviewer_attribution && ` · ${article.reviewer_attribution}`} · {article.reading_time_minutes} min</p>
+        {article.first_published_at && <p>First published: {new Date(article.first_published_at).toLocaleDateString(locale)}{article.last_published_at !== article.first_published_at && article.last_published_at && ` · Updated: ${new Date(article.last_published_at).toLocaleDateString(locale)}`}</p>}
+        {article.cover && <img src={article.cover.url} alt={article.cover.alt} width={article.cover.width} height={article.cover.height} referrerPolicy="no-referrer" className="h-auto w-full" />}
+        <BlogBody body={article.body} />
+        {article.references.length > 0 && (
+          <section>
+            <h3>References</h3>
+            <ul>
+              {article.references.map((ref, i) => (
+                <li key={i}>
+                  {safeBlogHref(ref.url) ? (
+                    <a href={ref.url} target="_blank" rel="noreferrer noopener" className="break-all underline">
+                      {ref.label}
+                    </a>
+                  ) : (
+                    ref.label
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </article>
+    )}
+  </Card>;
 }

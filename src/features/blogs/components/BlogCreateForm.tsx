@@ -1,4 +1,7 @@
 import { useState, type FormEvent } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { BlogCreateFormProps } from '../types/blogs.types';
 
 export function slugPreview(title: string): string {
@@ -37,15 +40,13 @@ export function BlogCreateForm({
   return (
     <form onSubmit={handleSubmit} className="mt-5 grid gap-4 sm:grid-cols-2">
       <div>
-        <label htmlFor="new-blog-category" className="block text-sm font-medium">
-          Category
-        </label>
+        <Label htmlFor="new-blog-category">Category</Label>
         <select
           id="new-blog-category"
           required
           value={categoryID}
           onChange={(e) => setSelectedCategoryID(e.target.value)}
-          className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2"
+          className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
         >
           <option value="" disabled>
             {options?.categories.length ? 'Select a category' : 'No categories available'}
@@ -64,55 +65,50 @@ export function BlogCreateForm({
       </div>
 
       <div>
-        <label htmlFor="new-blog-title" className="block text-sm font-medium">
-          Title
-        </label>
-        <input
+        <Label htmlFor="new-blog-title">Title</Label>
+        <Input
           id="new-blog-title"
           maxLength={180}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2"
+          className="mt-2 w-full"
         />
       </div>
 
       <div className="sm:col-span-2">
-        <label htmlFor="new-blog-slug" className="block text-sm font-medium">
-          Slug (optional)
-        </label>
-        <input
+        <Label htmlFor="new-blog-slug">Slug (optional)</Label>
+        <Input
           id="new-blog-slug"
           value={slug}
           placeholder={slugPreview(title)}
           onChange={(e) => setSlug(e.target.value)}
-          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2"
+          className="mt-2 w-full"
         />
         <p className="mt-1 text-sm text-slate-600">Leave empty to use a slug made from the title.</p>
       </div>
 
       {createError && (
-        <p role="alert" className="text-red-800 sm:col-span-2">
+        <p role="alert" className="text-destructive font-medium text-sm sm:col-span-2">
           {createError}
         </p>
       )}
 
       <div className="sm:col-span-2 flex items-center gap-3">
-        <button
+        <Button
           type="submit"
           disabled={creating || !categoryID || Boolean(noCategories)}
-          className="rounded-md bg-crimson px-4 py-2 font-semibold text-white sm:w-fit disabled:opacity-50"
         >
           {creating ? 'Creating…' : 'Create draft'}
-        </button>
+        </Button>
         {onCancel && (
-          <button
+          <Button
             type="button"
+            variant="outline"
             disabled={creating}
             onClick={onCancel}
-            className="rounded-md border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
             Cancel
-          </button>
+          </Button>
         )}
       </div>
     </form>

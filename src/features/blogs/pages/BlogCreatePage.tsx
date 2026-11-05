@@ -3,6 +3,8 @@ import { ApiError, describeError } from '../../../lib/api';
 import { useBlogOptions } from '../hooks/useBlogOptions';
 import { useCreateBlogPost } from '../hooks/useBlogMutations';
 import { BlogCreateForm } from '../components/BlogCreateForm';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import type { BlogCreateData, BlogCreatePageProps } from '../types/blogs.types';
 
 export function BlogCreatePage({ onExpired, onCreated, onCancel }: BlogCreatePageProps) {
@@ -43,19 +45,20 @@ export function BlogCreatePage({ onExpired, onCreated, onCancel }: BlogCreatePag
   return (
     <div className="mt-6 space-y-6">
       <div className="flex items-center justify-between">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           disabled={creating}
           onClick={onCancel}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
         >
           ← Back to blog library
-        </button>
+        </Button>
       </div>
 
-      <section
+      <Card
         aria-label="Create article draft"
-        className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+        className="p-6"
       >
         <h2 className="text-xl font-semibold">New article draft</h2>
         <p className="mt-1 text-sm text-slate-600">
@@ -67,15 +70,16 @@ export function BlogCreatePage({ onExpired, onCreated, onCancel }: BlogCreatePag
             Loading authoring options…
           </p>
         ) : optionsError ? (
-          <div role="alert" className="mt-5 rounded-md bg-red-50 p-4 text-red-800">
+          <div role="alert" className="mt-5 border border-destructive/20 bg-destructive/10 text-destructive rounded-md p-4">
             <p>{describeError(optionsError)}</p>
-            <button
+            <Button
               type="button"
+              variant="outline"
               onClick={() => void refetch()}
-              className="mt-3 rounded-md bg-crimson px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+              className="mt-3"
             >
               Retry
-            </button>
+            </Button>
           </div>
         ) : (
           <BlogCreateForm
@@ -86,7 +90,7 @@ export function BlogCreatePage({ onExpired, onCreated, onCancel }: BlogCreatePag
             onCancel={onCancel}
           />
         )}
-      </section>
+      </Card>
     </div>
   );
 }

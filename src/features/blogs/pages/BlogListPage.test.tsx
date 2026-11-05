@@ -85,7 +85,8 @@ describe('BlogListPage', () => {
 
     await waitFor(() => {
       expect(listSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ page: 2, status: 'draft', category: 'ent-health' })
+        expect.objectContaining({ page: 2, status: 'draft', category: 'ent-health' }),
+        expect.anything(),
       );
     });
 
@@ -112,7 +113,7 @@ describe('BlogListPage', () => {
     fireEvent.change(screen.getByLabelText('Status'), { target: { value: 'published' } });
 
     await waitFor(() => {
-      expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'published', page: 1 }));
+      expect(listSpy).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'published', page: 1 }), expect.anything());
       expect(window.location.search).toContain('status=published');
       expect(window.location.search).not.toContain('page=2');
     });

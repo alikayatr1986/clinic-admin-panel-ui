@@ -35,7 +35,8 @@ export function useCreateTimeframeMutation() {
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsKeys.timeframes() });
-      void client.invalidateQueries({ queryKey: ['gallery-options'] });
+      // Cross-feature catalog keys are kept as literals rather than importing other features' key modules.
+      void client.invalidateQueries({ queryKey: ['gallery', 'options'] });
     },
   });
 }
@@ -47,7 +48,7 @@ export function useUpdateTimeframeMutation() {
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsKeys.timeframes() });
-      void client.invalidateQueries({ queryKey: ['gallery-options'] });
+      void client.invalidateQueries({ queryKey: ['gallery', 'options'] });
     },
   });
 }
@@ -59,7 +60,7 @@ export function useActivateTimeframeMutation() {
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsKeys.timeframes() });
-      void client.invalidateQueries({ queryKey: ['gallery-options'] });
+      void client.invalidateQueries({ queryKey: ['gallery', 'options'] });
     },
   });
 }
@@ -71,7 +72,7 @@ export function useRetireTimeframeMutation() {
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsKeys.timeframes() });
-      void client.invalidateQueries({ queryKey: ['gallery-options'] });
+      void client.invalidateQueries({ queryKey: ['gallery', 'options'] });
     },
   });
 }
@@ -83,7 +84,7 @@ export function useDeleteTimeframeMutation() {
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsKeys.timeframes() });
-      void client.invalidateQueries({ queryKey: ['gallery-options'] });
+      void client.invalidateQueries({ queryKey: ['gallery', 'options'] });
     },
   });
 }
@@ -95,7 +96,7 @@ export function useReorderTimeframesMutation() {
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsKeys.timeframes() });
-      void client.invalidateQueries({ queryKey: ['gallery-options'] });
+      void client.invalidateQueries({ queryKey: ['gallery', 'options'] });
     },
   });
 }
@@ -112,7 +113,7 @@ export function useCreateProcedureMutation() {
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsKeys.procedures() });
-      void client.invalidateQueries({ queryKey: ['gallery-options'] });
+      void client.invalidateQueries({ queryKey: ['gallery', 'options'] });
     },
   });
 }
@@ -124,7 +125,7 @@ export function useUpdateProcedureMutation() {
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsKeys.procedures() });
-      void client.invalidateQueries({ queryKey: ['gallery-options'] });
+      void client.invalidateQueries({ queryKey: ['gallery', 'options'] });
     },
   });
 }
@@ -136,7 +137,7 @@ export function useProcedureActionMutation() {
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsKeys.procedures() });
-      void client.invalidateQueries({ queryKey: ['gallery-options'] });
+      void client.invalidateQueries({ queryKey: ['gallery', 'options'] });
     },
   });
 }
@@ -148,7 +149,7 @@ export function useReorderProceduresMutation() {
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsKeys.procedures() });
-      void client.invalidateQueries({ queryKey: ['gallery-options'] });
+      void client.invalidateQueries({ queryKey: ['gallery', 'options'] });
     },
   });
 }
@@ -162,7 +163,7 @@ export function useSaveBlogCategoryMutation() {
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsKeys.blogCategories() });
-      void client.invalidateQueries({ queryKey: ['blog-options'] });
+      void client.invalidateQueries({ queryKey: ['blogs', 'options'] });
     },
   });
 }
@@ -174,7 +175,7 @@ export function useBlogCategoryActionMutation() {
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: settingsKeys.blogCategories() });
-      void client.invalidateQueries({ queryKey: ['blog-options'] });
+      void client.invalidateQueries({ queryKey: ['blogs', 'options'] });
     },
   });
 }

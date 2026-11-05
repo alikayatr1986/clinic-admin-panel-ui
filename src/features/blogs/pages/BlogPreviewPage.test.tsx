@@ -140,11 +140,11 @@ describe('BlogPreviewPage', () => {
     });
 
     await screen.findByRole('region', { name: 'Saved article preview' });
-    expect(previewSpy).toHaveBeenCalledWith('post-preview-1', 'en', 4);
+    expect(previewSpy).toHaveBeenCalledWith('post-preview-1', 'en', 4, expect.anything());
 
     await user.click(screen.getByRole('tab', { name: 'العربية' }));
     await waitFor(() => {
-      expect(previewSpy).toHaveBeenCalledWith('post-preview-1', 'ar', 2);
+      expect(previewSpy).toHaveBeenCalledWith('post-preview-1', 'ar', 2, expect.anything());
     });
   });
 
@@ -185,6 +185,7 @@ describe('BlogPreviewPage', () => {
     );
 
     await screen.findByRole('region', { name: 'Saved article preview' });
+    await screen.findByText(mockPreviewResponse.title);
     // Initially not dirty
     expect(screen.queryByRole('status')).toBeNull();
 

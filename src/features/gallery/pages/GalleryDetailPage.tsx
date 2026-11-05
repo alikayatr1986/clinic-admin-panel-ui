@@ -3,6 +3,15 @@ import { useAdminNavigation } from "../../../lib/admin-navigation";
 import { ApiError } from "../../../lib/api";
 import { useGalleryActions, useGalleryCase } from "../hooks/useGallery";
 import type { GalleryDetailPageProps } from "../types/gallery.types";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export function GalleryDetailPage({
   caseID,
@@ -51,77 +60,96 @@ export function GalleryDetailPage({
       ? returnTo
       : "/admin/gallery";
   return (
-    <section className="mt-8 space-y-5 rounded-xl border border-slate-200 bg-white p-6">
-      <h2 className="text-xl font-semibold">Case {item.id}</h2>
-      <p>
-        Revision {item.revision} ·{" "}
-        {item.published ? "Published" : "Unpublished"}
-      </p>
-      {item.url && (
-        <img
-          src={item.url}
-          alt={
-            item.captions.find((caption) => caption.lang === "en")?.alt_text ||
-            "Combined before and after clinical image"
-          }
-          className="max-h-96 w-full object-contain"
-        />
-      )}
-      <p>
-        Procedure: {item.procedure_tag || "Not set"} · Timeframe:{" "}
-        {item.timeframe_badge || "Not set"}
-      </p>
-      {item.captions.map((caption) => (
-        <div
-          key={caption.lang}
-          lang={caption.lang}
-          dir={caption.lang === "ar" ? "rtl" : "ltr"}
-        >
-          <strong>
-            {caption.lang.toUpperCase()} · {caption.approval}
-          </strong>
-          <p>{caption.alt_text}</p>
-          <p>{caption.caption}</p>
+    <Card className="mt-8 space-y-5 p-6">
+      <CardHeader className="p-0">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-xl">Case {item.id}</CardTitle>
+          <Badge variant={item.published ? "default" : "secondary"}>
+            {item.published ? "Published" : "Unpublished"}
+          </Badge>
         </div>
-      ))}
-      {error && <p role="alert">{error}</p>}
-      <div className="flex flex-wrap gap-3">
-        <a
-          href={safeReturn}
-          onClick={(event) => {
-            if (
-              !event.metaKey &&
-              !event.ctrlKey &&
-              !event.shiftKey &&
-              !event.altKey &&
-              event.button === 0
-            ) {
-              event.preventDefault();
-              onBack();
+        <p className="text-sm text-slate-600">
+          Revision {item.revision}
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-5 p-0">
+        {item.url && (
+          <img
+            src={item.url}
+            alt={
+              item.captions.find((caption) => caption.lang === "en")?.alt_text ||
+              "Combined before and after clinical image"
             }
-          }}
+            className="max-h-96 w-full object-contain"
+          />
+        )}
+        <p>
+          Procedure: {item.procedure_tag || "Not set"} · Timeframe:{" "}
+          {item.timeframe_badge || "Not set"}
+        </p>
+        {item.captions.map((caption) => (
+          <div
+            key={caption.lang}
+            lang={caption.lang}
+            dir={caption.lang === "ar" ? "rtl" : "ltr"}
+          >
+            <strong>
+              {caption.lang.toUpperCase()} · {caption.approval}
+            </strong>
+            <p>{caption.alt_text}</p>
+            <p>{caption.caption}</p>
+          </div>
+        ))}
+        {error && <p role="alert" className="text-red-800">{error}</p>}
+      </CardContent>
+      <CardFooter className="flex flex-wrap gap-3 p-0">
+        <Button
+          asChild
+          variant="outline"
         >
-          Back to gallery
-        </a>
-        <a
-          href={`/admin/gallery/${encodeURIComponent(item.id)}/edit?returnTo=${encodeURIComponent(safeReturn)}`}
-          onClick={(event) => {
-            if (
-              !event.metaKey &&
-              !event.ctrlKey &&
-              !event.shiftKey &&
-              !event.altKey &&
-              event.button === 0
-            ) {
-              event.preventDefault();
-              onEdit(item.id);
-            }
-          }}
+          <a
+            href={safeReturn}
+            onClick={(event) => {
+              if (
+                !event.metaKey &&
+                !event.ctrlKey &&
+                !event.shiftKey &&
+                !event.altKey &&
+                event.button === 0
+              ) {
+                event.preventDefault();
+                onBack();
+              }
+            }}
+          >
+            Back to gallery
+          </a>
+        </Button>
+        <Button
+          asChild
+          variant="default"
         >
-          Edit case
-        </a>
-        <button
+          <a
+            href={`/admin/gallery/${encodeURIComponent(item.id)}/edit?returnTo=${encodeURIComponent(safeReturn)}`}
+            onClick={(event) => {
+              if (
+                !event.metaKey &&
+                !event.ctrlKey &&
+                !event.shiftKey &&
+                !event.altKey &&
+                event.button === 0
+              ) {
+                event.preventDefault();
+                onEdit(item.id);
+              }
+            }}
+          >
+            Edit case
+          </a>
+        </Button>
+        <Button
           type="button"
+          variant="destructive"
           onClick={() => {
             if (window.confirm("Delete this case?"))
               void perform(
@@ -135,10 +163,11 @@ export function GalleryDetailPage({
           }}
         >
           Delete case
-        </button>
+        </Button>
         {item.consent_id && (
-          <button
+          <Button
             type="button"
+            variant="destructive"
             onClick={() => {
               if (window.confirm("Withdraw consent for all associated cases?"))
                 void perform(async () => {
@@ -148,9 +177,9 @@ export function GalleryDetailPage({
             }}
           >
             Withdraw consent
-          </button>
+          </Button>
         )}
-      </div>
-    </section>
+      </CardFooter>
+    </Card>
   );
 }

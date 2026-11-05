@@ -44,6 +44,7 @@ const FORBIDDEN_APPEARANCE_PATTERNS = [
 
 const ALLOWED_EXCEPTIONS_BY_FILE: Record<string, string[]> = {
   'src/features/gallery/components/GalleryCaseEditor.tsx': ['file-input', 'media-canvas'],
+  'src/features/blogs/components/BlogEditor.tsx': ['file-input', 'range-input'],
 };
 
 export function findUIBoundaryViolations(
@@ -156,7 +157,17 @@ export function findUIBoundaryViolations(
               file: filePath,
               line: getLine(),
               type: 'unauthorized-raw-control',
-              message: 'Native file input is only authorized in documented gallery media upload surfaces.',
+              message: 'Native file input is only authorized in documented media upload surfaces.',
+            });
+          }
+        } else if (inputType === 'range') {
+          const exceptions = ALLOWED_EXCEPTIONS_BY_FILE[filePath] || [];
+          if (!exceptions.includes('range-input')) {
+            violations.push({
+              file: filePath,
+              line: getLine(),
+              type: 'unauthorized-raw-control',
+              message: 'Native range input is only authorized in documented focal point adjustment surfaces.',
             });
           }
         } else if (inputType === 'checkbox') {
@@ -321,7 +332,7 @@ describe('UI Boundary Structural Check', () => {
     expect(allViolations).toEqual([]);
   });
 
-  it('ensures zero unauthorized raw controls in migrated auth, app, layout, and settings production files', () => {
+  it('ensures zero unauthorized raw controls in migrated auth, app, layout, settings, blog, and gallery production files', () => {
     const migratedFiles = [
       'src/features/auth/components/LoginPage.tsx',
       'src/app/AdminApp.tsx',
@@ -335,6 +346,25 @@ describe('UI Boundary Structural Check', () => {
       'src/features/settings/components/ProcedureFormDialog.tsx',
       'src/features/settings/components/TimeframeFormDialog.tsx',
       'src/features/settings/components/ActivationAttestationDialog.tsx',
+      'src/features/blogs/components/BlogList.tsx',
+      'src/features/blogs/components/BlogCreateForm.tsx',
+      'src/features/blogs/components/BlogEditor.tsx',
+      'src/features/blogs/components/BlogPublishPanel.tsx',
+      'src/features/blogs/components/BlogGenerator.tsx',
+      'src/features/blogs/components/BlogGenerationReview.tsx',
+      'src/features/blogs/components/BlogPreview.tsx',
+      'src/features/blogs/pages/BlogDetailPage.tsx',
+      'src/features/blogs/pages/BlogPreviewPage.tsx',
+      'src/features/blogs/pages/BlogCreatePage.tsx',
+      'src/features/blogs/pages/BlogListPage.tsx',
+      'src/features/blogs/pages/BlogEditPage.tsx',
+      'src/features/gallery/components/GalleryCaseList.tsx',
+      'src/features/gallery/components/GalleryCaseEditor.tsx',
+      'src/features/gallery/components/GalleryContentEditor.tsx',
+      'src/features/gallery/pages/GalleryListPage.tsx',
+      'src/features/gallery/pages/GalleryDetailPage.tsx',
+      'src/features/gallery/pages/GalleryCreatePage.tsx',
+      'src/features/gallery/pages/GalleryEditPage.tsx',
     ];
 
     const productionFiles = import.meta.glob('../**/*.{ts,tsx}', {

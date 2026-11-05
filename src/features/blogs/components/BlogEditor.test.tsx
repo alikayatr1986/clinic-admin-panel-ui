@@ -92,7 +92,7 @@ describe('BlogEditor', () => {
     const preview = vi.spyOn(blogsApi, 'preview').mockResolvedValue({ data: { id: post.id, slug: post.slug, lang: 'ar', title: 'AR saved preview', excerpt: '', category: { key: 'ent-health', label: 'Health' }, first_published_at: '', last_published_at: '', reading_time_minutes: 1, author_name: 'Clinic', body: post.ar!.body, cover: null, references: [] } });
     render(<BlogEditor postID="post-1" role="admin" onExpired={vi.fn()} onNavigate={vi.fn()} registerBlocker={vi.fn()} />);
     fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'EN unsaved title' } }); fireEvent.click(screen.getByRole('tab', { name: 'العربية' })); fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'عنوان محلي' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Preview saved revision' })); expect(await screen.findByText('AR saved preview')).toBeInTheDocument(); expect(preview).toHaveBeenCalledWith('post-1', 'ar', 9);
+    fireEvent.click(screen.getByRole('button', { name: 'Preview saved revision' })); expect(await screen.findByText('AR saved preview')).toBeInTheDocument(); expect(preview).toHaveBeenCalledWith('post-1', 'ar', 9, expect.anything());
     fireEvent.click(screen.getByRole('button', { name: 'Publish update' })); fireEvent.click(screen.getByRole('button', { name: 'Confirm publish' })); await waitFor(() => expect(publish).toHaveBeenCalled()); await screen.findByRole('alert'); expect(screen.getByLabelText('Title')).toHaveValue('عنوان محلي');
     fireEvent.click(screen.getByRole('tab', { name: 'English' })); expect(screen.getByLabelText('Title')).toHaveValue('EN unsaved title'); expect(screen.getByText('Unsaved changes')).toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Unpublish' })).toBeInTheDocument();
   });
@@ -107,7 +107,7 @@ describe('BlogEditor', () => {
     await screen.findByLabelText('Title');
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Submitted EN title' } }); fireEvent.click(screen.getByRole('button', { name: 'Save' })); fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Typed during save' } });
     resolve({ data: { id: post.id, aggregate_revision: 3, edition_revision: 10, updated_at: '' } }); await waitFor(() => expect(screen.getByRole('button', { name: 'Preview saved revision' })).toBeEnabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Preview saved revision' })); await waitFor(() => expect(preview).toHaveBeenCalledWith('post-1', 'en', 10)); expect(screen.getByLabelText('Title')).toHaveValue('Typed during save');
+    fireEvent.click(screen.getByRole('button', { name: 'Preview saved revision' })); await waitFor(() => expect(preview).toHaveBeenCalledWith('post-1', 'en', 10, expect.anything())); expect(screen.getByLabelText('Title')).toHaveValue('Typed during save');
     fireEvent.click(screen.getByRole('tab', { name: 'العربية' })); expect(screen.getByLabelText('Title')).toHaveValue('ar saved title');
   });
   it('keeps dirty text through conflict and blocks navigation', async () => {
@@ -142,7 +142,7 @@ describe('BlogEditor', () => {
     let resolve!: (value: { data: { media_id: string; aggregate_revision: number; width: number; height: number; focal_x: number; focal_y: number } }) => void;
     const upload = vi.spyOn(blogsApi, 'upload').mockReturnValue(new Promise((done) => { resolve = done; })); const save = vi.spyOn(blogsApi, 'save').mockResolvedValue({ data: { id: 'post-1', aggregate_revision: 8, edition_revision: 1, updated_at: '2026-01-02T00:00:00Z' } });
     render(<BlogEditor postID="post-1" onExpired={vi.fn()} onNavigate={vi.fn()} registerBlocker={vi.fn()} />); const title = await screen.findByLabelText('Title'); fireEvent.change(title, { target: { value: 'Unsaved while uploading' } });
-    const image = new File(['bytes'], 'cover.png', { type: 'image/png' }); fireEvent.change(screen.getByLabelText('Image'), { target: { files: [image] } }); fireEvent.change(screen.getByLabelText('Rights/source record'), { target: { value: 'Licensed stock record' } }); const button = screen.getByRole('button', { name: 'Upload cover' }); fireEvent.click(button); fireEvent.click(button); expect(upload).toHaveBeenCalledOnce();
+    const image = new File(['bytes'], 'cover.png', { type: 'image/png' }); fireEvent.change(screen.getByLabelText('Image'), { target: { files: [image] } }); fireEvent.change(screen.getByLabelText('Rights/source record'), { target: { value: 'Licensed stock record' } }); const button = screen.getByRole('button', { name: 'Upload cover' }); fireEvent.click(button); fireEvent.click(button); await waitFor(() => expect(upload).toHaveBeenCalledOnce());
     resolve({ data: { media_id: 'media-1', aggregate_revision: 7, width: 1600, height: 1200, focal_x: .5, focal_y: .5 } }); expect(await screen.findByText(/Cover uploaded/)).toBeInTheDocument(); expect(title).toHaveValue('Unsaved while uploading'); expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save' })); await waitFor(() => expect(save).toHaveBeenCalledWith('post-1', expect.objectContaining({ expected_revision: 7, cover_media_id: 'media-1', title: 'Unsaved while uploading' })));
   });
