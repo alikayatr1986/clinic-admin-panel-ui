@@ -1,4 +1,5 @@
 import { BlogDraftProvider } from '../context/BlogDraftContext';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { cleanup, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -6,7 +7,7 @@ import { blogsApi } from '../services/blogs.service';
 import type { BlogDetail, BlogEdition, BlogLocale, BlogReviewKind } from '../types/blogs.types';
 import { BlogEditor } from './BlogEditor';
 
-function render(element: ReactElement) { return rtlRender(element, { wrapper: BlogDraftProvider }); }
+function render(element: ReactElement) { const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } }); const Wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}><BlogDraftProvider>{children}</BlogDraftProvider></QueryClientProvider>; return rtlRender(element, { wrapper: Wrapper }); }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); window.history.replaceState({}, '', '/admin/'); });
 const REQUIRED: Record<BlogLocale, BlogReviewKind[]> = { en: ['editorial', 'medical', 'media_rights'], ar: ['editorial', 'medical', 'translation', 'media_rights'] };
 const edition = (lang: BlogLocale, body: boolean): BlogEdition => ({ id: `${lang}-1`, language: lang, edition_revision: 1, title: lang === 'en' ? 'Sinus care basics' : 'أساسيات العناية بالجيوب', excerpt: 'x', body: { schema_version: 1, blocks: body ? [{ type: 'paragraph', text: 'Body' }] : [] }, cover_media_id: 'm', cover_alt: 'alt', author_name: 'Clinic', reviewer_attribution: null, seo_title: '', seo_description: '', references: [], origin: 'manual', updated_at: '' });

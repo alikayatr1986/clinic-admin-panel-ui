@@ -2,6 +2,10 @@ import { useState, type FormEvent } from 'react';
 import { ApiError } from '../../../lib/api';
 import type { LoginPageProps } from '../types/auth.types';
 import { describeError } from '../utils/auth.utils';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 
 export function LoginPage({ onLogin }: LoginPageProps) {
   const [username, setUsername] = useState('');
@@ -26,24 +30,54 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
   return (
     <main className="grid min-h-screen place-items-center px-4 py-12">
-      <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-widest text-crimson">Clinic administration</p>
-        <h1 className="mt-3 text-3xl font-semibold">Staff sign in</h1>
-        <p className="mt-2 text-slate-600">Use your clinic staff credentials.</p>
-        <form onSubmit={submit} className="mt-8 space-y-5">
-          <div>
-            <label htmlFor="username" className="block text-sm font-medium">Username</label>
-            <input id="username" name="username" autoComplete="username" required value={username} onChange={(event) => setUsername(event.target.value)} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 focus-visible:outline-2 focus-visible:outline-crimson" />
-          </div>
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium">Password</label>
-            <input id="password" name="password" type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 focus-visible:outline-2 focus-visible:outline-crimson" />
-          </div>
-          {error && <p role="alert" className="rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-          <button disabled={busy} type="submit" className="w-full rounded-md bg-crimson px-4 py-2.5 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-crimson">{busy ? 'Signing in…' : 'Sign in'}</button>
-        </form>
-      </section>
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <p className="text-sm font-semibold uppercase tracking-widest text-primary">Clinic administration</p>
+          <CardTitle asChild className="text-2xl"><h1>Staff sign in</h1></CardTitle>
+          <CardDescription>Use your clinic staff credentials.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={submit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                name="username"
+                type="text"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </div>
+            {error && (
+              <p
+                role="alert"
+                className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                {error}
+              </p>
+            )}
+            <Button disabled={busy} type="submit" className="w-full">
+              {busy ? 'Signing in…' : 'Sign in'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </main>
   );
 }
+
 

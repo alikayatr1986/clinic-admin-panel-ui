@@ -1,4 +1,5 @@
 import { BlogDraftProvider } from '../context/BlogDraftContext';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,7 +8,16 @@ import { blogsApi } from '../services/blogs.service';
 import { BlogEditor } from './BlogEditor';
 import type { BlogDetail, BlogEdition, BlogLocale, BlogReviewKind } from '../types/blogs.types';
 
-function render(element: ReactElement) { return rtlRender(element, { wrapper: BlogDraftProvider }); }
+function render(element: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
+  return rtlRender(element, {
+    wrapper: ({ children }) => (
+      <QueryClientProvider client={client}>
+        <BlogDraftProvider>{children}</BlogDraftProvider>
+      </QueryClientProvider>
+    ),
+  });
+}
 afterEach(() => { cleanup(); vi.restoreAllMocks(); window.history.replaceState({}, '', '/admin/'); });
 beforeEach(() => { vi.spyOn(window, 'confirm').mockReturnValue(true); });
 const detail = { id: 'post-1', slug: 'draft-post', category_id: 'cat-1', category_key: 'ent-health', status: 'draft' as const, aggregate_revision: 2, first_published_at: null, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' };

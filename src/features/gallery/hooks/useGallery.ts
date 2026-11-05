@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { galleryApi } from '../services/gallery.service';
 import { galleryKeys } from './gallery.keys';
-import type { GalleryEdit, GalleryFilters } from '../types/gallery.types';
+import type { GalleryContentUpdate, GalleryEdit, GalleryFilters } from '../types/gallery.types';
 
 export function useGalleryOptions() {
   return useQuery({ queryKey: [...galleryKeys.all, 'options'], queryFn: ({ signal }) => galleryApi.options(signal), retry: false });
@@ -23,4 +23,12 @@ export function useGalleryActions() {
   const remove = useMutation({ mutationFn: ({ id, revision }: { id: string; revision: number }) => galleryApi.remove(id, revision), onSuccess: invalidate, retry: false });
   const withdraw = useMutation({ mutationFn: (id: string) => galleryApi.withdrawConsent(id), onSuccess: invalidate, retry: false });
   return { create, edit, upload, preview, publish, remove, withdraw };
+}
+
+export function useGalleryContent(lang: 'en' | 'ar') {
+  return useQuery({ queryKey: galleryKeys.content(lang), queryFn: ({ signal }) => galleryApi.content(lang, signal), retry: false });
+}
+export function useSaveGalleryContent() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (input: GalleryContentUpdate) => galleryApi.updateContent(input), retry: false, onSuccess: (data, input) => client.setQueryData(galleryKeys.content(input.lang), data) });
 }

@@ -1,4 +1,5 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NavigationBoundary } from '../../../app/navigation';
 import type { ReactElement } from 'react';
 import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
@@ -7,7 +8,7 @@ import { BlogListPage } from './BlogListPage';
 import { blogsApi } from '../services/blogs.service';
 import { ApiError } from '../../../lib/api';
 
-function render(element: ReactElement) { const router = createBrowserRouter([{ element: <NavigationBoundary />, children: [{ path: '*', element }] }], { basename: '/admin' }); return rtlRender(<RouterProvider router={router} />); }
+function render(element: ReactElement) { const router = createBrowserRouter([{ element: <NavigationBoundary />, children: [{ path: '*', element }] }], { basename: '/admin' }); const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } }); return rtlRender(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>); }
 beforeEach(() => {
   window.history.replaceState({}, '', '/admin/blogs');
 });

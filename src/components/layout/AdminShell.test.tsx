@@ -35,7 +35,8 @@ describe('AdminShell component', () => {
     );
 
     expect(screen.getByText('Skip to main content')).toBeInTheDocument();
-    expect(screen.getByText(/Signed in as testadmin · admin/)).toBeInTheDocument();
+    expect(screen.getByText(/Signed in as testadmin/)).toBeInTheDocument();
+    expect(screen.getByText('admin')).toHaveAttribute('data-slot', 'badge');
     expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
     expect(screen.getByText('Dashboard Content')).toBeInTheDocument();
 
@@ -83,5 +84,57 @@ describe('AdminShell component', () => {
     );
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('disables sign-out button and displays pending text while logout is unresolved', async () => {
+    const user = userEvent.setup();
+    let resolveLogout!: () => void;
+    const pendingLogout = new Promise<void>((resolve) => {
+      resolveLogout = resolve;
+    });
+    const onLogout = vi.fn().mockReturnValue(pendingLogout);
+
+    render(
+      <AdminShell
+        path="/admin/"
+        session={mockSession}
+        routeId="dashboard"
+        onNavigate={vi.fn()}
+        onLogout={onLogout}
+        onExpired={vi.fn()}
+      >
+        <p>Dashboard Content</p>
+      </AdminShell>
+    );
+
+    const signOutBtn = screen.getByRole('button', { name: 'Sign out' });
+    expect(signOutBtn).toHaveAttribute('type', 'button');
+    await user.click(signOutBtn);
+
+    expect(onLogout).toHaveBeenCalledOnce();
+    const pendingBtn = screen.getByRole('button', { name: 'Signing out…' });
+    expect(pendingBtn).toBeDisabled();
+
+    resolveLogout();
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Sign out' })).not.toBeDisabled();
+    });
+  });
+
+  it('renders Settings page title when routeId is settings', () => {
+    render(
+      <AdminShell
+        path="/admin/settings"
+        session={mockSession}
+        routeId="settings"
+        onNavigate={vi.fn()}
+        onLogout={vi.fn()}
+        onExpired={vi.fn()}
+      >
+        <p>Settings Content</p>
+      </AdminShell>
+    );
+
+    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
   });
 });

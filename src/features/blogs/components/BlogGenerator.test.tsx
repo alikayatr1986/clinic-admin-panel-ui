@@ -1,9 +1,13 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../lib/api';
 import { blogsApi } from '../services/blogs.service';
 import { BlogGenerator } from './BlogGenerator';
 import type { BlogGenerationJob } from '../types/blogs.types';
+
+function render(element: ReactElement) { const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } }); const Wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>; return rtlRender(element, { wrapper: Wrapper }); }
 
 describe('BlogGenerator', () => {
   beforeEach(() => {
@@ -104,7 +108,7 @@ describe('BlogGenerator', () => {
 
     render(<BlogGenerator {...baseProps} />);
 
-    await waitFor(() => expect(getSpy).toHaveBeenCalledWith('post-1', 'job-persisted'));
+    await waitFor(() => expect(getSpy).toHaveBeenCalledWith('post-1', 'job-persisted', expect.anything()));
     expect(await screen.findByText('Status: running')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Cancel job/i })).toBeInTheDocument();
   });

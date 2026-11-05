@@ -1,4 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../lib/api';
 import { blogsApi } from '../services/blogs.service';
@@ -6,6 +8,7 @@ import type { BlogDetail, BlogEdition, BlogLocale, BlogReviewKind } from '../typ
 import { BlogPublishPanel } from './BlogPublishPanel';
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+function render(element: ReactElement) { const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } }); const Wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>; return rtlRender(element, { wrapper: Wrapper }); }
 const edition = (lang: BlogLocale): BlogEdition => ({ id: `${lang}-uuid`, language: lang, edition_revision: lang === 'en' ? 8 : 9, title: lang === 'en' ? 'Saved title' : 'عنوان محفوظ', excerpt: 'excerpt', author_name: 'Clinic', body: { schema_version: 1, blocks: [{ type: 'paragraph', text: 'body' }] }, cover_media_id: 'media', cover_alt: 'cover', reviewer_attribution: null, seo_title: '', seo_description: '', references: [], origin: 'manual', updated_at: '' });
 const required = (lang: BlogLocale): BlogReviewKind[] => lang === 'en' ? ['editorial', 'medical', 'media_rights'] : ['editorial', 'medical', 'translation', 'media_rights'];
 const post = (): BlogDetail => ({ id: 'p', slug: 'post', category_id: 'cat', category_key: 'ent-health', status: 'published_with_changes', aggregate_revision: 20, first_published_at: '', created_at: '', updated_at: '', en: edition('en'), ar: edition('ar'), active_publication: { id: 'old-live' }, readiness: { en: { revision_id: 'en-uuid', revision: 8, required_reviews: required('en'), completed_reviews: required('en'), missing_fields: [] }, ar: { revision_id: 'ar-uuid', revision: 9, required_reviews: required('ar'), completed_reviews: required('ar'), missing_fields: [] } } });

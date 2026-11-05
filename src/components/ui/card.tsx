@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { Slot } from '@radix-ui/react-slot';
 import { cn } from '@/lib/utils';
 import { cardVariants } from '@/types/card.types';
 import type {
@@ -41,11 +42,12 @@ const CardHeader = React.forwardRef<HTMLDivElement, CardHeaderProps>(function Ca
 CardHeader.displayName = 'CardHeader';
 
 const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(function CardTitle(
-  { className, ...props },
+  { className, asChild = false, ...props },
   ref
 ) {
+  const Comp = asChild ? Slot : 'h3';
   return (
-    <h3
+    <Comp
       data-slot="card-title"
       ref={ref}
       className={cn('font-semibold leading-none tracking-tight', className)}

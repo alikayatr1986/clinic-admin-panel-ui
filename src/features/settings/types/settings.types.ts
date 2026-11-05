@@ -163,4 +163,9 @@ export interface ProcedureSettingsTableProps {
 
 export interface BlogCategorySetting { id: string; key: string; name_en: string; name_ar: string; status: 'active' | 'retired'; reference_count: number }
 export interface BlogCategoryInput { key: string; name_en: string; name_ar: string }
+export interface SaveBlogCategoryParams { input: BlogCategoryInput; id?: string }
+export interface BlogCategoryActionParams { id: string; action: 'retire' | 'delete' }
+export interface UpdateProcedureParams { id: string; input: Omit<ProcedureFormData, 'code'> }
+export interface ProcedureActionParams { id: string; action: 'activate' | 'retire' | 'delete' }
+export interface ReorderProceduresParams { orderedIds: string[] }
 export interface BlogCategoryPanelProps { role: string; onExpired?: () => void }

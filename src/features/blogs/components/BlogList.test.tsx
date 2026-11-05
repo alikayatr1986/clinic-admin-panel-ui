@@ -1,4 +1,5 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { NavigationBoundary } from '../../../app/navigation';
 import type { ReactElement } from 'react';
 import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
@@ -7,7 +8,7 @@ import { blogsApi } from '../services/blogs.service';
 import { ApiError } from '../../../lib/api';
 import { BlogList } from './BlogList';
 
-function render(element: ReactElement) { if (!window.location.pathname.startsWith('/admin')) window.history.replaceState({}, '', '/admin/blogs'); const router = createBrowserRouter([{ element: <NavigationBoundary />, children: [{ path: '*', element }] }], { basename: '/admin' }); return rtlRender(<RouterProvider router={router} />); }
+function render(element: ReactElement) { if (!window.location.pathname.startsWith('/admin')) window.history.replaceState({}, '', '/admin/blogs'); const router = createBrowserRouter([{ element: <NavigationBoundary />, children: [{ path: '*', element }] }], { basename: '/admin' }); const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } }); return rtlRender(<QueryClientProvider client={client}><RouterProvider router={router} /></QueryClientProvider>); }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); window.history.replaceState({}, '', '/admin/blogs'); });
 const options = { limits: {}, generation_enabled: false, categories: [{ id: 'category-1', key: 'ent-health', name_en: 'ENT Health', name_ar: 'صحة' }] };
 

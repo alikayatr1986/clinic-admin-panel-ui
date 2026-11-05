@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import type { RouteObject } from 'react-router-dom';
-import { DashboardRoute, NotFoundRoute, BlogListRoute, BlogCreateRoute, BlogDetailRoute, BlogEditRoute, GalleryListRoute, GalleryDetailRoute, GalleryEditorRoute, LeadListRoute, LeadDetailRoute, SettingsRoute } from './RoutePages';
+import { DashboardRoute, NotFoundRoute, BlogListRoute, BlogCreateRoute, BlogDetailRoute, BlogEditRoute, GalleryListRoute, GalleryContentRoute, GalleryDetailRoute, GalleryEditorRoute, LeadListRoute, LeadDetailRoute, SettingsRoute } from './RoutePages';
 
 export const adminRouteContracts: RouteObject[] = [
   { id: 'dashboard', path: '/', element: createElement(DashboardRoute) },
@@ -12,6 +12,7 @@ export const adminRouteContracts: RouteObject[] = [
   { id: 'blog-preview', path: '/blogs/:id/preview', element: createElement(BlogEditRoute) },
   { id: 'gallery-list', path: '/gallery', element: createElement(GalleryListRoute) },
   { id: 'gallery-create', path: '/gallery/new', element: createElement(GalleryEditorRoute) },
+  { id: 'gallery-content', path: '/gallery/content', element: createElement(GalleryContentRoute) },
   { id: 'gallery-detail', path: '/gallery/:id', element: createElement(GalleryDetailRoute) },
   { id: 'gallery-edit', path: '/gallery/:id/edit', element: createElement(GalleryEditorRoute) },
   { id: 'lead-list', path: '/leads', element: createElement(LeadListRoute) },

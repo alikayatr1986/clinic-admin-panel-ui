@@ -1,15 +1,13 @@
 import { useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { ApiError, describeError } from '../../../lib/api';
-import { blogsApi } from '../services/blogs.service';
 import { useBlogOptions } from '../hooks/useBlogOptions';
-import { blogKeys } from '../hooks/blog.keys';
+import { useCreateBlogPost } from '../hooks/useBlogMutations';
 import { BlogCreateForm } from '../components/BlogCreateForm';
 import type { BlogCreateData, BlogCreatePageProps } from '../types/blogs.types';
 
 export function BlogCreatePage({ onExpired, onCreated, onCancel }: BlogCreatePageProps) {
-  const queryClient = useQueryClient();
   const { data: options, isLoading, error: optionsError, refetch } = useBlogOptions(onExpired);
+  const createPost = useCreateBlogPost();
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
   const submittingRef = useRef(false);
@@ -23,14 +21,13 @@ export function BlogCreatePage({ onExpired, onCreated, onCancel }: BlogCreatePag
     setCreating(true);
     setCreateError('');
     try {
-      const result = await blogsApi.create(
-        data.categoryID,
-        data.slug,
-        idempotencyKeyRef.current,
-        data.title
-      );
-      void queryClient.invalidateQueries({ queryKey: blogKeys.all });
-      onCreated(result.data.id);
+      const result = await createPost.mutateAsync({
+        categoryID: data.categoryID,
+        slug: data.slug,
+        idempotencyKey: idempotencyKeyRef.current,
+        title: data.title,
+      });
+      onCreated(result.id);
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) {
         onExpired();

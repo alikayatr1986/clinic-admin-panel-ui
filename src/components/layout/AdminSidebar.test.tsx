@@ -36,10 +36,13 @@ describe('AdminSidebar component', () => {
 
     const blogsLink = screen.getByRole('link', { name: 'Blogs' });
     expect(blogsLink).toHaveAttribute('aria-current', 'page');
-    expect(blogsLink).toHaveClass('text-crimson');
+    expect(blogsLink).toHaveClass('bg-secondary');
 
     const galleryLink = screen.getByRole('link', { name: 'Gallery' });
     expect(galleryLink).not.toHaveAttribute('aria-current');
+    expect(galleryLink).not.toHaveClass('bg-secondary');
+    expect(galleryLink).toHaveAttribute('data-slot', 'button');
+    expect(galleryLink).toHaveClass('hover:bg-accent');
   });
 
   it('opens mobile drawer with focus trap, dismisses with Escape, and returns focus to trigger', async () => {
@@ -69,6 +72,7 @@ describe('AdminSidebar component', () => {
     expect(drawer).toBeInTheDocument();
 
     const closeButton = screen.getByRole('button', { name: 'Close navigation menu' });
+    expect(closeButton.querySelector('svg')).toBeInTheDocument();
     await vi.waitFor(() => expect(document.activeElement).toBe(closeButton));
 
     // Press Escape to dismiss
@@ -94,6 +98,7 @@ describe('AdminSidebar component', () => {
     );
 
     const closeButton = screen.getByRole('button', { name: 'Close navigation menu' });
+    expect(closeButton.querySelector('svg')).toBeInTheDocument();
     await vi.waitFor(() => expect(document.activeElement).toBe(closeButton));
 
     const mobileLinks = screen.getAllByRole('link');

@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { ApiError } from '../lib/api';
 import { authApi } from '../features/auth/services/auth.service';
 import { galleryApi } from '../features/gallery/services/gallery.service';
 import type { GalleryCase } from '../features/gallery/types/gallery.types';
@@ -13,6 +14,7 @@ const item: GalleryCase = { id: 'case-1', revision: 1, published: false, display
 function setup(path: string) {
   window.history.replaceState({}, '', path);
   vi.spyOn(authApi, 'session').mockResolvedValue({ data: { username: 'staff', role: 'staff', expires_at: '2030-01-01' } });
+  vi.spyOn(galleryApi, 'content').mockResolvedValue({ data: [] });
   vi.spyOn(galleryApi, 'get').mockResolvedValue({ data: item });
   vi.spyOn(galleryApi, 'options').mockResolvedValue({ data: { procedures: [], timeframes: [] } });
   vi.spyOn(galleryApi, 'list').mockResolvedValue({ data: [item], total: 1, page: 1, page_size: 12 });
@@ -23,6 +25,26 @@ function setup(path: string) {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); window.history.replaceState({}, '', '/admin/'); });
 
 describe('gallery routes', () => {
+  it('opens section editor and publishes the selected language with returned status', async () => {
+    const router = setup('/admin/gallery/content');
+    const update = vi.spyOn(galleryApi, 'updateContent').mockResolvedValue({ data: [{ type: 'gallery', lang: 'en', eyebrow: 'E', heading: 'H', introduction: 'I', statistics: [], revision: 2, published: true, approval: 'approved' }] });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText(/eyebrow/i), 'E'); await user.type(screen.getByLabelText(/heading/i), 'H'); await user.type(screen.getByLabelText(/introduction/i), 'I');
+    await user.click(screen.getByRole('button', { name: 'Publish reviewed content' }));
+    await waitFor(() => expect(update).toHaveBeenCalledWith(expect.objectContaining({ lang: 'en', expected_revision: 1, approval: 'approved' })));
+    expect(await screen.findByText(/Server saved revision 2 with status approved/)).toBeVisible();
+    expect(galleryApi.get).not.toHaveBeenCalled(); router.dispose();
+  });
+  it('retains edits and requires explicit recovery after a conflict', async () => {
+    const router = setup('/admin/gallery/content');
+    vi.spyOn(galleryApi, 'updateContent').mockRejectedValue(new ApiError(409, 'CONFLICT', 'Stale'));
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText(/eyebrow/i), 'E'); await user.type(screen.getByLabelText(/heading/i), 'H'); await user.type(screen.getByLabelText(/introduction/i), 'I');
+    await user.click(screen.getByRole('button', { name: 'Save draft' }));
+    expect(await screen.findByRole('button', { name: 'Reapply my edits' })).toBeVisible();
+    expect(screen.getByLabelText(/heading/i)).toHaveValue('H');
+    router.dispose();
+  });
   it('opens a saved detail directly and links to its editor', async () => {
     const router = setup('/admin/gallery/case-1');
     expect(await screen.findByRole('heading', { name: 'Case case-1' })).toBeVisible();

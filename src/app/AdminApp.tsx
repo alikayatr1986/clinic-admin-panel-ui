@@ -7,12 +7,23 @@ import { useAdminNavigation } from '../lib/admin-navigation';
 import { AdminShell } from '../components/layout/AdminShell';
 import { BlogDraftProvider } from '../features/blogs/context/BlogDraftContext';
 import { clearLeadFilters } from '../features/leads/hooks/leadFilters';
-import { authApi } from '../features/auth/services/auth.service';
+import { useAuth } from '../features/auth/hooks/useAuth';
 import type { AdminSession } from '../features/auth/types/auth.types';
 import { describeError, safeReturnTarget } from '../features/auth/utils/auth.utils';
 import { LoginPage } from '../features/auth/components/LoginPage';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 export function AdminApp() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AdminAppContent />
+    </QueryClientProvider>
+  );
+}
+
+function AdminAppContent() {
+  const { fetchSession, login: authLogin, logout: authLogout } = useAuth();
   const maybeNavigation = useAdminNavigation();
   if (!maybeNavigation) throw new Error('AdminApp requires the admin router');
   const navigation = maybeNavigation;
@@ -40,21 +51,20 @@ export function AdminApp() {
   }
   async function checkSession() {
     setChecking(true); setSessionError('');
-    try { const { data } = await authApi.session(); updateSession(data); if (navigation.routeId === 'login') navigation.navigate('/admin/', { replace: true, bypassBlock: true }); }
+    try { const data = await fetchSession(); updateSession(data); if (navigation.routeId === 'login') navigation.navigate('/admin/', { replace: true, bypassBlock: true }); }
     catch (error) { if (error instanceof ApiError && error.status === 401) { setReauthenticating(true); navigation.navigate('/admin/login', { replace: true, bypassBlock: true }); } else setSessionError(describeError(error)); }
     finally { setChecking(false); }
   }
   useEffect(() => { void checkSession(); }, []);
   async function login(username: string, password: string) {
-    await authApi.login(username, password);
-    const { data } = await authApi.session();
+    const data = await authLogin(username, password);
     const previous = identity.current;
     updateSession(data); void queryClient.invalidateQueries(); setReauthenticating(false); expiryPending.current = false;
     navigation.navigate(previous && previous !== `${data.username}:${data.role}` ? '/admin/' : returnTarget.current, { replace: true, bypassBlock: true });
   }
   async function logout() {
     if (blocker.current && !blocker.current()) return;
-    try { await authApi.logout(); }
+    try { await authLogout(); }
     catch (error) { if (!(error instanceof ApiError && error.status === 401)) throw error; }
     returnTarget.current = '/admin/'; updateSession(null); navigation.navigate('/admin/login', { replace: true, bypassBlock: true });
   }
@@ -69,10 +79,25 @@ export function AdminApp() {
   const savedOutlet = useRef(outlet);
   if (!reauthenticating) savedOutlet.current = outlet;
   if (checking) return <main className="grid min-h-screen place-items-center p-6"><p role="status">Checking staff session…</p></main>;
-  if (sessionError) return <main className="grid min-h-screen place-items-center p-6"><section className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 shadow-sm"><h1 className="text-2xl font-semibold">Unable to verify your session</h1><p role="alert" className="mt-3 text-slate-700">{sessionError}</p><button className="mt-6 rounded-md bg-crimson px-4 py-2 font-medium text-white" onClick={() => void checkSession()}>Retry</button></section></main>;
+  if (sessionError)
+    return (
+      <main className="grid min-h-screen place-items-center p-6">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle asChild><h1>Unable to verify your session</h1></CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p role="alert" className="text-sm text-slate-700">
+              {sessionError}
+            </p>
+            <Button type="button" onClick={() => void checkSession()}>Retry</Button>
+          </CardContent>
+        </Card>
+      </main>
+    );
   if (!session) return <LoginPage onLogin={login} />;
-  return <QueryClientProvider client={queryClient}><BlogDraftProvider key={`${session.username}:${session.role}`}><div hidden={reauthenticating}><AdminShell session={session} path={reauthenticating ? returnTarget.current.split('?')[0] : navigation.pathname} routeId={navigation.routeId} onNavigate={(path) => navigation.navigate(path)} onLogout={logout} onExpired={handleExpired}>
+  return <BlogDraftProvider key={`${session.username}:${session.role}`}><div hidden={reauthenticating}><AdminShell session={session} path={reauthenticating ? returnTarget.current.split('?')[0] : navigation.pathname} routeId={navigation.routeId} onNavigate={(path) => navigation.navigate(path)} onLogout={logout} onExpired={handleExpired}>
     {navigation.routeId === 'blog-list' && blogNotice && <p role="status" className="mt-5 rounded-md bg-green-50 p-4 text-green-900">{blogNotice}</p>}
     {reauthenticating ? savedOutlet.current : outlet}
-  </AdminShell></div>{reauthenticating && <LoginPage onLogin={login} />}</BlogDraftProvider></QueryClientProvider>;
+  </AdminShell></div>{reauthenticating && <LoginPage onLogin={login} />}</BlogDraftProvider>;
 }

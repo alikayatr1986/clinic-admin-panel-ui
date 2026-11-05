@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { describeError } from '../../../lib/api';
-import { blogsApi } from '../services/blogs.service';
 import { useBlogDetail } from '../hooks/useBlogDetail';
 import { useBlogOptions } from '../hooks/useBlogOptions';
-import { blogKeys } from '../hooks/blog.keys';
+import { useDeleteBlogPost } from '../hooks/useBlogMutations';
 import { BlogBody } from '../components/BlogPreview';
 import type { BlogDetailPageProps, BlogLocale } from '../types/blogs.types';
 
@@ -19,9 +17,9 @@ export function BlogDetailPage({
   onBack,
   onDeleted = onBack,
 }: BlogDetailPageProps) {
-  const queryClient = useQueryClient();
   const { data: post, isLoading, error: detailError, refetch } = useBlogDetail(postID, onExpired);
   const { data: options } = useBlogOptions(onExpired);
+  const deletePost = useDeleteBlogPost();
   const [selectedLocale, setSelectedLocale] = useState<BlogLocale>('en');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -64,8 +62,7 @@ export function BlogDetailPage({
     setDeleting(true);
     setDeleteError('');
     try {
-      await blogsApi.delete(postID);
-      void queryClient.invalidateQueries({ queryKey: blogKeys.all });
+      await deletePost.mutateAsync(postID);
       onDeleted();
     } catch (err) {
       setDeleteError(describeError(err));

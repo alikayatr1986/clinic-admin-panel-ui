@@ -1,9 +1,17 @@
-import { useDashboardOverview } from '../hooks/useDashboardOverview';
+import { useEffect } from 'react';
+import { ApiError } from '../../../lib/api';
+import { useGalleryList } from '../../gallery/hooks/useGallery';
 import { describeError } from '../../auth/utils/auth.utils';
 import type { DashboardPageProps } from '../types/dashboard.types';
 
 export function DashboardPage({ onExpired }: DashboardPageProps) {
-  const { data, isLoading, isFetching, error, refetch } = useDashboardOverview(onExpired);
+  const { data, isLoading, isFetching, error, refetch } = useGalleryList({ page: 1, page_size: 1 });
+
+  useEffect(() => {
+    if (error instanceof ApiError && error.status === 401) onExpired();
+  }, [error, onExpired]);
+
+  const totalGalleryCases = data?.total;
 
   return (
     <section
@@ -29,12 +37,12 @@ export function DashboardPage({ onExpired }: DashboardPageProps) {
             {isFetching ? 'Retrying…' : 'Retry'}
           </button>
         </div>
-      ) : data?.totalGalleryCases == null || data.totalGalleryCases === 0 ? (
+      ) : totalGalleryCases == null || totalGalleryCases === 0 ? (
         <p className="mt-3 text-slate-600">No gallery cases yet.</p>
       ) : (
         <p className="mt-3 text-slate-600">
-          {data.totalGalleryCases} gallery{' '}
-          {data.totalGalleryCases === 1 ? 'case' : 'cases'} available.
+          {totalGalleryCases} gallery{' '}
+          {totalGalleryCases === 1 ? 'case' : 'cases'} available.
         </p>
       )}
     </section>

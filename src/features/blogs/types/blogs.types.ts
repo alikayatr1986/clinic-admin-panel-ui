@@ -57,6 +57,44 @@ export interface BlogCreateData {
   title: string;
 }
 
+export interface BlogCreateMutationInput {
+  categoryID: string;
+  slug: string;
+  idempotencyKey: string;
+  title?: string;
+}
+
+export interface BlogCreateResult { id: string; aggregate_revision: number }
+export interface BlogSaveParams { id: string; input: BlogSaveInput }
+export interface BlogUploadParams {
+  id: string;
+  file: File;
+  expectedRevision: number;
+  rights: string;
+  focalX: number;
+  focalY: number;
+  onProgress: (percent: number) => void;
+}
+export interface BlogReviewParams { id: string; revisionID: string; kind: BlogReviewKind; reference?: string }
+export interface BlogPublishParams {
+  id: string;
+  expectedAggregateRevision: number;
+  categoryID: string;
+  enRevisionID: string;
+  arRevisionID: string;
+}
+export interface BlogUnpublishParams { id: string; revision: number }
+export interface BlogFeatureParams { revision: number; postID: string | null }
+export interface BlogGenerationQueueParams {
+  id: string;
+  lang: BlogLocale;
+  idempotencyKey: string;
+  baseRevision: number;
+  brief: BlogGenerationBrief;
+}
+export interface BlogGenerationJobParams { id: string; jobID: string }
+export interface BlogGenerationApplyParams extends BlogGenerationJobParams { selectedFields: string[] }
+
 export interface BlogCreateFormProps {
   options: BlogOptions | null;
   creating: boolean;

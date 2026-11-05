@@ -1,7 +1,8 @@
 import type { BlogGeneratorProps } from '../types/blogs.types';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError } from '../../../lib/api';
-import { blogsApi } from '../services/blogs.service';
+import { useBlogEditorReads } from '../hooks/useBlogReads';
+import { useApplyBlogGeneration, useCancelBlogGeneration, useDiscardBlogGeneration, useQueueBlogGeneration } from '../hooks/useBlogMutations';
 import type { BlogGenerationBrief, BlogGenerationJob, BlogGenerationSource, BlogLocale } from '../types/blogs.types';
 import { BlogGenerationReview } from './BlogGenerationReview';
 
@@ -39,6 +40,11 @@ export function BlogGenerator({
 
   const pollCount = useRef(0);
   const maxPolls = 48; // ~120s with 2.5s interval
+  const { loadGeneration } = useBlogEditorReads();
+  const queueGeneration = useQueueBlogGeneration();
+  const cancelGeneration = useCancelBlogGeneration();
+  const discardGeneration = useDiscardBlogGeneration();
+  const applyGeneration = useApplyBlogGeneration();
 
   // Reopen persisted job from localStorage on mount or locale change
   useEffect(() => {
@@ -51,11 +57,9 @@ export function BlogGenerator({
     }
 
     let active = true;
-    blogsApi
-      .getGeneration(postID, savedJobID)
-      .then((res) => {
+    loadGeneration(postID, savedJobID)
+      .then((j) => {
         if (!active) return;
-        const j = res.data;
         if (j.status === 'applied' || j.status === 'discarded') {
           localStorage.removeItem(storageKey(postID, locale));
           setJob(null);
@@ -72,7 +76,7 @@ export function BlogGenerator({
     return () => {
       active = false;
     };
-  }, [postID, locale]);
+  }, [postID, locale, loadGeneration]);
 
   // Bounded polling while queued or running
   useEffect(() => {
@@ -87,8 +91,7 @@ export function BlogGenerator({
         return;
       }
       try {
-        const res = await blogsApi.getGeneration(postID, job.id);
-        const updated = res.data;
+        const updated = await loadGeneration(postID, job.id);
         setJob(updated);
         if (updated.status !== 'queued' && updated.status !== 'running') {
           clearInterval(interval);
@@ -105,7 +108,7 @@ export function BlogGenerator({
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [postID, locale, job?.id, job?.status]);
+  }, [postID, locale, job?.id, job?.status, loadGeneration]);
 
   function addSource() {
     if (sources.length >= 10) return;
@@ -189,13 +192,13 @@ export function BlogGenerator({
         : `gen-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     try {
-      const res = await blogsApi.queueGeneration(postID, {
+      const createdJob = await queueGeneration.mutateAsync({
+        id: postID,
         lang: locale,
-        idempotency_key: idempotencyKey,
-        base_revision: baseRevision,
+        idempotencyKey,
+        baseRevision,
         brief,
       });
-      const createdJob = res.data;
       setJob(createdJob);
       localStorage.setItem(storageKey(postID, locale), createdJob.id);
       setNotice(`Generation job queued for ${locale.toUpperCase()}.`);
@@ -222,7 +225,7 @@ export function BlogGenerator({
     setCanceling(true);
     setError('');
     try {
-      await blogsApi.cancelGeneration(postID, job.id);
+      await cancelGeneration.mutateAsync({ id: postID, jobID: job.id });
       setJob((prev) => (prev ? { ...prev, status: 'canceled' } : null));
     } catch (err) {
       if (err instanceof ApiError) setError(err.message);
@@ -237,7 +240,7 @@ export function BlogGenerator({
     setDiscarding(true);
     setError('');
     try {
-      await blogsApi.discardGeneration(postID, job.id);
+      await discardGeneration.mutateAsync({ id: postID, jobID: job.id });
       localStorage.removeItem(storageKey(postID, locale));
       setJob(null);
       setNotice('Generation result discarded.');
@@ -254,7 +257,7 @@ export function BlogGenerator({
     setApplying(true);
     setError('');
     try {
-      await blogsApi.applyGeneration(postID, job.id, selectedFields);
+      await applyGeneration.mutateAsync({ id: postID, jobID: job.id, selectedFields });
       localStorage.removeItem(storageKey(postID, locale));
       setJob(null);
       await onRefresh();

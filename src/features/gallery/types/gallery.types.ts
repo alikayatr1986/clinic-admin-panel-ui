@@ -112,6 +112,7 @@ export interface GalleryUploadResult {
 export interface GalleryListPageProps {
   onExpired: () => void;
   onCreate?: () => void;
+  onContent?: () => void;
   onEdit?: (id: string) => void;
 }
 export interface GalleryEditorPageProps {
@@ -143,3 +144,7 @@ export interface GalleryParsedQuery { filters: GalleryFilters; invalid: boolean 
 
 
 export interface GalleryPreviewState { url: string; expires_at: string }
+
+export interface GalleryContentEditorProps { username: string; onExpired: () => void; onBack: () => void; registerBlocker: (blocker: (() => boolean) | null) => void }
+export type GalleryContentForm = { eyebrow: string; heading: string; introduction: string; statistics: GalleryStatistic[] };
+export interface GalleryContentRecovery { lang: GalleryLocale; form: GalleryContentForm; revision: number }

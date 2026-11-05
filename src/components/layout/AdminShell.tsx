@@ -3,6 +3,8 @@ import type { AdminShellProps } from '../../types/layout.types';
 import { getNavItems } from './navigation';
 import { AdminSidebar } from './AdminSidebar';
 import { describeError } from '../../lib/api';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 export function AdminShell({
   path,
@@ -24,7 +26,11 @@ export function AdminShell({
   }, [path, routeId]);
 
   const pageTitle =
-    routeId === 'lead-list'
+    routeId === 'settings'
+      ? 'Settings'
+      : routeId === 'gallery-content'
+      ? 'Gallery section content'
+      : routeId === 'lead-list'
       ? 'Leads'
       : routeId === 'lead-detail'
       ? 'Lead details'
@@ -76,27 +82,35 @@ export function AdminShell({
         <div className="mx-auto flex w-full items-center justify-between px-5 py-4">
           <div>
             <p className="font-semibold text-midnight">Clinic administration</p>
-            <p className="text-sm text-slate-600">
-              Signed in as {session.username} · {session.role}
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-sm text-slate-600">
+                Signed in as {session.username}
+              </span>
+              <span className="text-slate-400">·</span>
+              <Badge variant="outline">{session.role}</Badge>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <button
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
               disabled={loggingOut}
               onClick={() => void submitLogout()}
-              className="rounded-md border border-slate-300 px-3 py-2 font-medium text-sm hover:bg-slate-50 transition-colors"
             >
               {loggingOut ? 'Signing out…' : 'Sign out'}
-            </button>
+            </Button>
 
-            <button
+            <Button
               ref={menuButtonRef}
               type="button"
+              variant="outline"
+              size="icon"
               aria-label="Open navigation menu"
               aria-expanded={isOpenMobile}
               onClick={() => setIsOpenMobile(true)}
-              className="lg:hidden rounded-md border border-slate-300 p-2 text-slate-700 hover:bg-slate-50 transition-colors"
+              className="lg:hidden"
             >
               <svg
                 aria-hidden="true"
@@ -112,7 +126,7 @@ export function AdminShell({
                   d="M4 6h16M4 12h16M4 18h16"
                 />
               </svg>
-            </button>
+            </Button>
           </div>
         </div>
       </header>

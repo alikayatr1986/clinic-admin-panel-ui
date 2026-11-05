@@ -35,8 +35,8 @@ export const galleryApi = {
     });
   },
   options(signal?: AbortSignal) { return adminRequest<{ data: GalleryOptions }>('/admin/api/gallery-options', { signal }); },
-  content(lang: 'en' | 'ar') {
-    return adminRequest<{ data: GalleryContent[] }>(`/admin/api/gallery-content?lang=${lang}`);
+  content(lang: 'en' | 'ar', signal?: AbortSignal) {
+    return adminRequest<{ data: GalleryContent[] }>(`/admin/api/gallery-content?lang=${lang}`, { signal });
   },
   updateContent(input: GalleryContentUpdate) {
     return adminRequest<{ data: GalleryContent[] }>('/admin/api/gallery-content', {

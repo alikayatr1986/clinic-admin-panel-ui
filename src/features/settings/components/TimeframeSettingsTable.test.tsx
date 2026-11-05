@@ -176,5 +176,39 @@ describe('TimeframeSettingsTable', () => {
     const secondDown = screen.getByLabelText('Move 3-6-months down');
     expect(secondDown).toBeDisabled();
   });
+
+  it('disables delete action for admin when draft timeframe has referenced cases', () => {
+    const referencedDraft: TimeframeSetting = {
+      id: 'tf-ref',
+      code: '6-9-months',
+      name_en: '6–9 Months',
+      name_ar: '٦-٩ أشهر',
+      min_months: 6,
+      max_months: 9,
+      display_order: 3,
+      status: 'draft',
+      referenced_cases_count: 2,
+      created_at: '2026-11-05T00:00:00Z',
+      updated_at: '2026-11-05T00:00:00Z',
+    };
+
+    render(
+      <TimeframeSettingsTable
+        timeframes={[referencedDraft]}
+        role="admin"
+        isLoading={false}
+        onEdit={vi.fn()}
+        onActivate={vi.fn()}
+        onRetire={vi.fn()}
+        onDelete={vi.fn()}
+        onMoveUp={vi.fn()}
+        onMoveDown={vi.fn()}
+      />
+    );
+
+    const deleteBtn = screen.getByRole('button', { name: 'Delete' });
+    expect(deleteBtn).toBeDisabled();
+    expect(deleteBtn).toHaveAttribute('title', 'Cannot delete referenced timeframe');
+  });
 });
 

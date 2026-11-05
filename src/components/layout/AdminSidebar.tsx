@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { AdminSidebarProps } from '../../types/layout.types';
 import { isNavItemActive } from './navigation';
+import { Button } from '@/components/ui/button';
 
 export function AdminSidebar({
   items,
@@ -69,26 +70,27 @@ export function AdminSidebar({
         const active = isNavItemActive(item, currentPath);
         return (
           <li key={item.id}>
-            <a
-              href={item.path}
-              aria-current={active ? 'page' : undefined}
-              onClick={(event) => {
-                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
-                event.preventDefault();
-                onNavigate(item.path);
-                if (isMobile) {
-                  onCloseMobile();
-                  triggerRef?.current?.focus();
-                }
-              }}
-              className={`flex items-center rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
-                active
-                  ? 'bg-red-50 text-crimson font-semibold'
-                  : 'text-slate-700 hover:bg-slate-100 hover:text-midnight'
-              }`}
+            <Button
+              asChild
+              variant={active ? 'secondary' : 'ghost'}
+              className="w-full justify-start"
             >
-              {item.label}
-            </a>
+              <a
+                href={item.path}
+                aria-current={active ? 'page' : undefined}
+                onClick={(event) => {
+                  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                  event.preventDefault();
+                  onNavigate(item.path);
+                  if (isMobile) {
+                    onCloseMobile();
+                    triggerRef?.current?.focus();
+                  }
+                }}
+              >
+                {item.label}
+              </a>
+            </Button>
           </li>
         );
       })}
@@ -122,17 +124,25 @@ export function AdminSidebar({
           <div className="fixed inset-y-0 right-0 z-50 flex w-64 flex-col border-l border-slate-200 bg-white p-6 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
               <h2 className="text-base font-semibold text-midnight">Navigation</h2>
-              <button
+              <Button
                 ref={closeButtonRef}
                 type="button"
+                variant="ghost"
+                size="icon"
                 aria-label="Close navigation menu"
                 onClick={handleDismiss}
-                className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
               >
-                <span aria-hidden="true" className="text-xl font-bold leading-none">
-                  ×
-                </span>
-              </button>
+                <svg
+                  className="size-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </Button>
             </div>
             <nav aria-label="Admin mobile navigation">{renderNavList(true)}</nav>
           </div>

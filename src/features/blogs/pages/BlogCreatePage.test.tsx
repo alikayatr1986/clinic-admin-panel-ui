@@ -94,7 +94,7 @@ describe('BlogCreatePage', () => {
     fireEvent.click(submitBtn);
     fireEvent.click(submitBtn);
 
-    expect(blogsApi.create).toHaveBeenCalledOnce();
+    await waitFor(() => expect(blogsApi.create).toHaveBeenCalledOnce());
     expect(submitBtn).toBeDisabled();
     expect(submitBtn).toHaveTextContent('Creating…');
     expect(backBtn).toBeDisabled();

@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react';
 import { ApiError } from '../../../lib/api';
+import { Button } from '@/components/ui/button';
 import { BlogCategorySettings } from '../components/BlogCategorySettings';
 import { ActivationAttestationDialog } from '../components/ActivationAttestationDialog';
 import { ProcedureFormDialog } from '../components/ProcedureFormDialog';
 import { ProcedureSettingsTable } from '../components/ProcedureSettingsTable';
-import { settingsApi } from '../services/settings.service';
 import { SettingsTabs } from '../components/SettingsTabs';
 import { TimeframeFormDialog } from '../components/TimeframeFormDialog';
 import { TimeframeSettingsTable } from '../components/TimeframeSettingsTable';
 import {
-  useProcedureMutation,
+  useCreateProcedureMutation,
+  useProcedureActionMutation,
   useProcedureSettingsQuery,
   useActivateTimeframeMutation,
   useCreateTimeframeMutation,
   useDeleteTimeframeMutation,
+  useReorderProceduresMutation,
   useReorderTimeframesMutation,
   useRetireTimeframeMutation,
   useTimeframeSettingsQuery,
+  useUpdateProcedureMutation,
   useUpdateTimeframeMutation,
 } from '../hooks/useSettings';
 import type {
@@ -44,19 +47,23 @@ export function SettingsPage({ role = 'admin', onExpired }: SettingsPageProps) {
   const [pageError, setPageError] = useState<string | null>(null);
 
   const procedureQuery = useProcedureSettingsQuery();
-  const procedureMutation = useProcedureMutation();
+  const createProcedureMutation = useCreateProcedureMutation();
+  const updateProcedureMutation = useUpdateProcedureMutation();
+  const procedureActionMutation = useProcedureActionMutation();
+  const reorderProceduresMutation = useReorderProceduresMutation();
+  const procedureBusy = createProcedureMutation.isPending || updateProcedureMutation.isPending || procedureActionMutation.isPending || reorderProceduresMutation.isPending;
   const [procedureFormOpen, setProcedureFormOpen] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<ProcedureSetting | null>(null);
   const procedures = procedureQuery.data?.data ?? [];
   const runProcedure = async (operation: () => Promise<unknown>) => {
     setPageError(null);
-    try { await procedureMutation.mutateAsync(operation); return true; }
+    try { await operation(); return true; }
     catch (err) { setPageError(err instanceof ApiError ? err.message : 'Failed to update procedure.'); return false; }
   };
   const submitProcedure = async (input: ProcedureFormData) => {
     const ok = await runProcedure(() => editingProcedure
-      ? settingsApi.updateProcedure(editingProcedure.id, { name_en: input.name_en, name_ar: input.name_ar, display_order: input.display_order })
-      : settingsApi.createProcedure(input));
+      ? updateProcedureMutation.mutateAsync({ id: editingProcedure.id, input: { name_en: input.name_en, name_ar: input.name_ar, display_order: input.display_order } })
+      : createProcedureMutation.mutateAsync(input));
     if (ok) setProcedureFormOpen(false);
   };
   const query = useTimeframeSettingsQuery('all');
@@ -208,13 +215,19 @@ export function SettingsPage({ role = 'admin', onExpired }: SettingsPageProps) {
         </div>
 
         {isAdmin && activeTab !== 'categories' && (
-          <button
+          <Button
             type="button"
-            onClick={() => { if (activeTab === 'procedures') { setEditingProcedure(null); setProcedureFormOpen(true); } else handleOpenCreate(); }}
-            className="inline-flex items-center justify-center rounded-lg bg-crimson px-4 py-2 text-sm font-medium text-white shadow-sm hover:opacity-90 transition-opacity"
+            onClick={() => {
+              if (activeTab === 'procedures') {
+                setEditingProcedure(null);
+                setProcedureFormOpen(true);
+              } else {
+                handleOpenCreate();
+              }
+            }}
           >
             Add {activeTab === 'procedures' ? 'Procedure' : 'Timeframe'}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -264,19 +277,19 @@ export function SettingsPage({ role = 'admin', onExpired }: SettingsPageProps) {
           {procedureQuery.isLoading ? <p role="status">Loading procedures…</p> : procedureQuery.isError ? <p role="alert">Failed to load procedures.</p> :
             <ProcedureSettingsTable procedures={procedures} role={role}
               onEdit={procedure => { setEditingProcedure(procedure); setProcedureFormOpen(true); }}
-              onActivate={procedure => void runProcedure(() => settingsApi.procedureAction(procedure.id, 'activate'))}
-              onRetire={procedure => { if (window.confirm(`Retire procedure "${procedure.name_en}"?`)) void runProcedure(() => settingsApi.procedureAction(procedure.id, 'retire')); }}
-              onDelete={procedure => { if (window.confirm(`Delete draft procedure "${procedure.name_en}"?`)) void runProcedure(() => settingsApi.procedureAction(procedure.id, 'delete')); }}
+              onActivate={procedure => void runProcedure(() => procedureActionMutation.mutateAsync({ id: procedure.id, action: 'activate' }))}
+              onRetire={procedure => { if (window.confirm(`Retire procedure "${procedure.name_en}"?`)) void runProcedure(() => procedureActionMutation.mutateAsync({ id: procedure.id, action: 'retire' })); }}
+              onDelete={procedure => { if (window.confirm(`Delete draft procedure "${procedure.name_en}"?`)) void runProcedure(() => procedureActionMutation.mutateAsync({ id: procedure.id, action: 'delete' })); }}
               onMove={(index, direction) => {
                 const target = index + (direction === 'up' ? -1 : 1);
                 if (target < 0 || target >= procedures.length) return;
                 const ordered = [...procedures];
                 [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
-                void runProcedure(() => settingsApi.reorderProcedures(ordered.map(item => item.id)));
+                void runProcedure(() => reorderProceduresMutation.mutateAsync({ orderedIds: ordered.map(item => item.id) }));
               }} />}
         </div>
       )}
-      {procedureFormOpen && <ProcedureFormDialog procedure={editingProcedure} isSubmitting={procedureMutation.isPending} error={pageError} onClose={() => setProcedureFormOpen(false)} onSubmit={data => void submitProcedure(data)} />}
+      {procedureFormOpen && <ProcedureFormDialog procedure={editingProcedure} isSubmitting={procedureBusy} error={pageError} onClose={() => setProcedureFormOpen(false)} onSubmit={data => void submitProcedure(data)} />}
 
       <TimeframeFormDialog
         isOpen={formDialogOpen}

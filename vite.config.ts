@@ -2,10 +2,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
+import { loadEnv } from 'vite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   base: '/admin/',
   resolve: {
     alias: {
@@ -19,7 +20,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/admin/api': {
-        target: 'http://127.0.0.1:8080',
+        target: loadEnv(mode, __dirname, '').API_BASE_URL || 'http://127.0.0.1:8080',
         changeOrigin: true,
       },
     },
@@ -30,4 +31,4 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     testTimeout: 15000,
   },
-});
+}));

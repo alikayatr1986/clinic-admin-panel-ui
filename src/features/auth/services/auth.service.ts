@@ -7,6 +7,6 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     }),
-  session: () => adminRequest<{ data: AdminSession }>('/admin/api/session'),
+  session: (signal?: AbortSignal) => adminRequest<{ data: AdminSession }>('/admin/api/session', { signal }),
   logout: () => adminRequest<{ data: { ok: boolean } }>('/admin/api/logout', { method: 'POST' }),
 };

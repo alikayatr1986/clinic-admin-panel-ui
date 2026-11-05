@@ -320,4 +320,40 @@ describe('UI Boundary Structural Check', () => {
 
     expect(allViolations).toEqual([]);
   });
+
+  it('ensures zero unauthorized raw controls in migrated auth, app, layout, and settings production files', () => {
+    const migratedFiles = [
+      'src/features/auth/components/LoginPage.tsx',
+      'src/app/AdminApp.tsx',
+      'src/components/layout/AdminShell.tsx',
+      'src/components/layout/AdminSidebar.tsx',
+      'src/features/settings/pages/SettingsPage.tsx',
+      'src/features/settings/components/SettingsTabs.tsx',
+      'src/features/settings/components/TimeframeSettingsTable.tsx',
+      'src/features/settings/components/ProcedureSettingsTable.tsx',
+      'src/features/settings/components/BlogCategorySettings.tsx',
+      'src/features/settings/components/ProcedureFormDialog.tsx',
+      'src/features/settings/components/TimeframeFormDialog.tsx',
+      'src/features/settings/components/ActivationAttestationDialog.tsx',
+    ];
+
+    const productionFiles = import.meta.glob('../**/*.{ts,tsx}', {
+      query: '?raw',
+      import: 'default',
+      eager: true,
+    }) as Record<string, string>;
+
+    const allViolations: BoundaryViolation[] = [];
+    for (const [path, source] of Object.entries(productionFiles)) {
+      const normalizedPath = path.replace(/^\.\.\//, 'src/');
+      if (migratedFiles.includes(normalizedPath)) {
+        const violations = findUIBoundaryViolations(normalizedPath, source, {
+          enforceRawControls: true,
+        });
+        allViolations.push(...violations);
+      }
+    }
+
+    expect(allViolations).toEqual([]);
+  });
 });

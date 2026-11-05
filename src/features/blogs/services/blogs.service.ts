@@ -16,7 +16,7 @@ export const blogsApi = {
   publish: (id: string, input: { expected_aggregate_revision: number; category_id: string; en_revision_id: string; ar_revision_id: string }) => adminRequest<{ data: { publication_id: string; aggregate_revision: number; first_published_at: string; last_published_at: string } }>(`${postPath(id)}/publish`, { method: 'POST', body: JSON.stringify(input) }),
   unpublish: (id: string, revision: number) => adminRequest<{ data: { id: string; aggregate_revision: number; unpublished: boolean } }>(`${postPath(id)}/unpublish`, { method: 'POST', body: JSON.stringify({ expected_revision: revision }) }),
   delete: (id: string) => adminRequest<{ data: { id: string; deleted: boolean } }>(postPath(id), { method: 'DELETE' }),
-  home: () => adminRequest<{ data: BlogHomeSettings }>('/admin/api/blog-home'),
+  home: (signal?: AbortSignal) => adminRequest<{ data: BlogHomeSettings }>('/admin/api/blog-home', { signal }),
   feature: (revision: number, postID: string | null) => adminRequest<{ data: BlogHomeSettings }>('/admin/api/blog-home', { method: 'PUT', body: JSON.stringify({ expected_revision: revision, featured_post_id: postID }) }),
   create(categoryID: string, slug: string, key: string, title = '') {
     return adminRequest<{ data: { id: string; aggregate_revision: number } }>('/admin/api/blogs', {
@@ -32,8 +32,8 @@ export const blogsApi = {
   queueGeneration(id: string, input: { lang: BlogLocale; idempotency_key: string; base_revision: number; brief: BlogGenerationBrief }) {
     return adminRequest<{ data: BlogGenerationJob }>(`${postPath(id)}/generation-jobs`, { method: 'POST', body: JSON.stringify(input) });
   },
-  getGeneration: (id: string, jobID: string) =>
-    adminRequest<{ data: BlogGenerationJob }>(`${postPath(id)}/generation-jobs/${encodeURIComponent(jobID)}`),
+  getGeneration: (id: string, jobID: string, signal?: AbortSignal) =>
+    adminRequest<{ data: BlogGenerationJob }>(`${postPath(id)}/generation-jobs/${encodeURIComponent(jobID)}`, { signal }),
   cancelGeneration: (id: string, jobID: string) =>
     adminRequest<{ data: unknown }>(`${postPath(id)}/generation-jobs/${encodeURIComponent(jobID)}/cancel`, { method: 'POST', body: '{}' }),
   discardGeneration: (id: string, jobID: string) =>
