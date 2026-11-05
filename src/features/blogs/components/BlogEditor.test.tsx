@@ -6,17 +6,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../lib/api';
 import { blogsApi } from '../services/blogs.service';
 import { BlogEditor } from './BlogEditor';
+import { blogKeys } from '../hooks/blog.keys';
 import type { BlogDetail, BlogEdition, BlogLocale, BlogReviewKind } from '../types/blogs.types';
 
 function render(element: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
-  return rtlRender(element, {
+  return { ...rtlRender(element, {
     wrapper: ({ children }) => (
       <QueryClientProvider client={client}>
         <BlogDraftProvider>{children}</BlogDraftProvider>
       </QueryClientProvider>
     ),
-  });
+  }), client };
 }
 afterEach(() => { cleanup(); vi.restoreAllMocks(); window.history.replaceState({}, '', '/admin/'); });
 beforeEach(() => { vi.spyOn(window, 'confirm').mockReturnValue(true); });
@@ -36,6 +37,31 @@ describe('BlogEditor', () => {
     expect(await screen.findByRole('option', { name: 'ENT Health (Retired)' })).toHaveValue('cat-1');
     fireEvent.click(screen.getByRole('tab', { name: 'العربية' }));
     expect(screen.getByRole('option', { name: 'صحة (Retired)' })).toHaveValue('cat-1');
+  });
+  it('rebases unchanged fields from query updates without overwriting a dirty field', async () => {
+    const post = reviewedPost();
+    vi.spyOn(blogsApi, 'get').mockResolvedValue({ data: post });
+    vi.spyOn(blogsApi, 'options').mockResolvedValue({ data: options });
+    const { client } = render(<BlogEditor postID="post-1" onExpired={vi.fn()} onNavigate={vi.fn()} registerBlocker={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Local title' } });
+    client.setQueryData(blogKeys.detail('post-1'), { ...post, en: { ...post.en!, title: 'Remote title', excerpt: 'Remote excerpt' } });
+    await waitFor(() => expect(screen.getByLabelText('Excerpt')).toHaveValue('Remote excerpt'));
+    expect(screen.getByLabelText('Title')).toHaveValue('Local title');
+  });
+  it('rebases a restored draft against newer server fields', async () => {
+    const post = reviewedPost();
+    const latest = { ...post, aggregate_revision: 3, en: { ...post.en!, title: 'Remote title', excerpt: 'Remote excerpt' } };
+    vi.spyOn(blogsApi, 'get').mockResolvedValueOnce({ data: post }).mockResolvedValue({ data: latest });
+    vi.spyOn(blogsApi, 'options').mockResolvedValue({ data: options });
+    const props = { postID: 'post-1', onExpired: vi.fn(), onNavigate: vi.fn(), registerBlocker: vi.fn() };
+    const view = render(<BlogEditor {...props} />);
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Local title' } });
+    await waitFor(() => expect(screen.getByText('Unsaved changes')).toBeInTheDocument());
+    view.rerender(<></>);
+    view.rerender(<BlogEditor {...props} />);
+    await waitFor(() => expect(screen.getByLabelText('Excerpt')).toHaveValue('Remote excerpt'));
+    expect(screen.getByLabelText('Title')).toHaveValue('Local title');
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
   });
   it('keeps manual authoring available when AI drafting is disabled', async () => {
     vi.spyOn(blogsApi, 'get').mockResolvedValue({ data: detail });
@@ -67,7 +93,7 @@ describe('BlogEditor', () => {
     render(<BlogEditor postID="post-1" role="admin" onExpired={vi.fn()} onNavigate={vi.fn()} registerBlocker={vi.fn()} />);
     fireEvent.click(await screen.findByRole('tab', { name: 'العربية' })); fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'عنوان محلي' } }); fireEvent.click(screen.getByRole('tab', { name: 'English' }));
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'EN submitted' } }); fireEvent.click(screen.getByRole('button', { name: 'Save' })); fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'EN during refresh' } });
-    await screen.findByText(/Saved details need refreshing/); expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled(); expect(screen.getByRole('button', { name: 'Preview saved revision' })).toBeDisabled(); expect(screen.queryByRole('button', { name: 'Publish update' })).not.toBeInTheDocument();
+    await screen.findByText(/Saved details need refreshing/); if (mode === 'mismatched') expect(screen.queryByText(/Revision 99/)).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled(); expect(screen.getByRole('button', { name: 'Preview saved revision' })).toBeDisabled(); expect(screen.queryByRole('button', { name: 'Publish update' })).not.toBeInTheDocument();
     const retry = screen.getByRole('button', { name: 'Retry saved details' }); fireEvent.click(retry); fireEvent.click(retry); expect(get).toHaveBeenCalledTimes(3); expect(retry).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Save' })); expect(save).toHaveBeenCalledTimes(2); resolve({ data: latest });
     await waitFor(() => expect(screen.getByRole('button', { name: 'Preview saved revision' })).toBeEnabled()); expect(screen.getByLabelText('Title')).toHaveValue('EN during refresh'); fireEvent.click(screen.getByRole('tab', { name: 'العربية' })); expect(screen.getByLabelText('Title')).toHaveValue('ar saved title');

@@ -1,5 +1,5 @@
-import { useCallback } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authApi } from '../services/auth.service';
 import type { AdminSession, LoginCredentials } from '../types/auth.types';
 
@@ -9,11 +9,20 @@ export const authKeys = {
 
 export function useAuth() {
   const client = useQueryClient();
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+
+  const session = useQuery<AdminSession | null>({
+    queryKey: authKeys.session(),
+    queryFn: async ({ signal }) => (await authApi.session(signal)).data,
+    enabled: false,
+    retry: false,
+  });
 
   const fetchSession = useCallback(
     () =>
       client.fetchQuery<AdminSession>({
-        queryKey: authKeys.session(),
+        queryKey: [...authKeys.session(), 'pending'],
         queryFn: async ({ signal }) => (await authApi.session(signal)).data,
         staleTime: 0,
         retry: false,
@@ -34,6 +43,7 @@ export function useAuth() {
   const login = useCallback(
     async (username: string, password: string) => {
       await loginMutation.mutateAsync({ username, password });
+      if (!mounted.current) throw new Error('Authentication was cancelled');
       return fetchSession();
     },
     [loginMutation, fetchSession],
@@ -41,5 +51,5 @@ export function useAuth() {
 
   const logout = useCallback(() => logoutMutation.mutateAsync(), [logoutMutation]);
 
-  return { fetchSession, login, logout };
+  return { session: session.data ?? null, fetchSession, login, logout };
 }

@@ -1,6 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { blogsApi } from '../services/blogs.service';
-import { blogKeys } from './blog.keys';
+import { getSessionGeneration } from "../../../lib/session-generation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { blogsApi } from "../services/blogs.service";
+import { blogKeys } from "./blog.keys";
 import type {
   BlogCreateMutationInput,
   BlogCreateResult,
@@ -17,12 +18,20 @@ import type {
   BlogSaveResult,
   BlogUnpublishParams,
   BlogUploadParams,
-} from '../types/blogs.types';
+} from "../types/blogs.types";
 
 export function useCreateBlogPost() {
   const client = useQueryClient();
   return useMutation<BlogCreateResult, Error, BlogCreateMutationInput>({
-    mutationFn: async (input) => (await blogsApi.create(input.categoryID, input.slug, input.idempotencyKey, input.title)).data,
+    mutationFn: async (input) =>
+      (
+        await blogsApi.create(
+          input.categoryID,
+          input.slug,
+          input.idempotencyKey,
+          input.title,
+        )
+      ).data,
     retry: false,
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: blogKeys.lists() });
@@ -45,8 +54,26 @@ export function useSaveBlogPost() {
 export function useUploadBlogCover() {
   const client = useQueryClient();
   return useMutation<BlogMediaResult, Error, BlogUploadParams>({
-    mutationFn: async ({ id, file, expectedRevision, rights, focalX, focalY, onProgress }) =>
-      (await blogsApi.upload(id, file, expectedRevision, rights, focalX, focalY, onProgress)).data,
+    mutationFn: async ({
+      id,
+      file,
+      expectedRevision,
+      rights,
+      focalX,
+      focalY,
+      onProgress,
+    }) =>
+      (
+        await blogsApi.upload(
+          id,
+          file,
+          expectedRevision,
+          rights,
+          focalX,
+          focalY,
+          onProgress,
+        )
+      ).data,
     retry: false,
     onSuccess: (_result, { id }) => {
       void client.invalidateQueries({ queryKey: blogKeys.detail(id) });
@@ -57,7 +84,13 @@ export function useUploadBlogCover() {
 export function usePublishBlogPost() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, expectedAggregateRevision, categoryID, enRevisionID, arRevisionID }: BlogPublishParams) =>
+    mutationFn: ({
+      id,
+      expectedAggregateRevision,
+      categoryID,
+      enRevisionID,
+      arRevisionID,
+    }: BlogPublishParams) =>
       blogsApi.publish(id, {
         expected_aggregate_revision: expectedAggregateRevision,
         category_id: categoryID,
@@ -75,7 +108,8 @@ export function usePublishBlogPost() {
 export function useUnpublishBlogPost() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, revision }: BlogUnpublishParams) => blogsApi.unpublish(id, revision),
+    mutationFn: ({ id, revision }: BlogUnpublishParams) =>
+      blogsApi.unpublish(id, revision),
     retry: false,
     onSuccess: (_result, { id }) => {
       void client.invalidateQueries({ queryKey: blogKeys.detail(id) });
@@ -99,7 +133,8 @@ export function useDeleteBlogPost() {
 export function useReviewBlogPost() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, revisionID, kind, reference }: BlogReviewParams) => blogsApi.review(id, revisionID, kind, reference),
+    mutationFn: ({ id, revisionID, kind, reference }: BlogReviewParams) =>
+      blogsApi.review(id, revisionID, kind, reference),
     retry: false,
     onSuccess: (_result, { id }) => {
       void client.invalidateQueries({ queryKey: blogKeys.detail(id) });
@@ -110,9 +145,12 @@ export function useReviewBlogPost() {
 export function useFeatureBlogPost() {
   const client = useQueryClient();
   return useMutation<BlogHomeSettings, Error, BlogFeatureParams>({
-    mutationFn: async ({ revision, postID }) => (await blogsApi.feature(revision, postID)).data,
+    mutationFn: async ({ revision, postID }) =>
+      (await blogsApi.feature(revision, postID)).data,
     retry: false,
-    onSuccess: (data) => {
+    onMutate: () => getSessionGeneration(),
+    onSuccess: (data, _variables, generation) => {
+      if (generation !== getSessionGeneration()) return;
       client.setQueryData(blogKeys.home(), data);
     },
   });
@@ -121,21 +159,30 @@ export function useFeatureBlogPost() {
 export function useQueueBlogGeneration() {
   return useMutation<BlogGenerationJob, Error, BlogGenerationQueueParams>({
     mutationFn: async ({ id, lang, idempotencyKey, baseRevision, brief }) =>
-      (await blogsApi.queueGeneration(id, { lang, idempotency_key: idempotencyKey, base_revision: baseRevision, brief })).data,
+      (
+        await blogsApi.queueGeneration(id, {
+          lang,
+          idempotency_key: idempotencyKey,
+          base_revision: baseRevision,
+          brief,
+        })
+      ).data,
     retry: false,
   });
 }
 
 export function useCancelBlogGeneration() {
   return useMutation({
-    mutationFn: ({ id, jobID }: BlogGenerationJobParams) => blogsApi.cancelGeneration(id, jobID),
+    mutationFn: ({ id, jobID }: BlogGenerationJobParams) =>
+      blogsApi.cancelGeneration(id, jobID),
     retry: false,
   });
 }
 
 export function useDiscardBlogGeneration() {
   return useMutation({
-    mutationFn: ({ id, jobID }: BlogGenerationJobParams) => blogsApi.discardGeneration(id, jobID),
+    mutationFn: ({ id, jobID }: BlogGenerationJobParams) =>
+      blogsApi.discardGeneration(id, jobID),
     retry: false,
   });
 }
@@ -143,7 +190,8 @@ export function useDiscardBlogGeneration() {
 export function useApplyBlogGeneration() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, jobID, selectedFields }: BlogGenerationApplyParams) => blogsApi.applyGeneration(id, jobID, selectedFields),
+    mutationFn: ({ id, jobID, selectedFields }: BlogGenerationApplyParams) =>
+      blogsApi.applyGeneration(id, jobID, selectedFields),
     retry: false,
     onSuccess: (_result, { id }) => {
       void client.invalidateQueries({ queryKey: blogKeys.detail(id) });

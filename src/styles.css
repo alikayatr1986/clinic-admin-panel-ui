@@ -75,8 +75,8 @@
 
 body {
   margin: 0;
-  background: var(--color-linen);
-  color: var(--color-midnight);
+  background: var(--color-background);
+  color: var(--color-foreground);
   font-family: Arial, sans-serif;
 }
 
@@ -86,9 +86,4 @@ button, input, textarea, select {
 
 button {
   cursor: pointer;
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: .65;
 }

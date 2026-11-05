@@ -51,6 +51,11 @@ export interface BlogGenerationJob {
   created_at: string; updated_at: string; provider?: string; model?: string; error_category?: string;
 }
 
+export interface BlogGenerationSelection {
+  scope: string;
+  id: string;
+}
+
 export interface BlogCreateData {
   categoryID: string;
   slug: string;
@@ -212,3 +217,5 @@ export interface BlogEditorProps { postID: string; role?: 'admin' | 'staff'; onE
 export interface BlogRequiredProps { children: string }
 export interface BlogPublishPanelProps { post: BlogDetail; onJump?: (locale: BlogLocale, field: string) => void; locked: boolean; lock: MutableRefObject<boolean>; onBusy: (busy: boolean) => void; onRefresh: () => Promise<void>; onDeleted: () => void }
 export interface BlogReviewSelection { locale: BlogLocale; revisionID: string; categoryID: string }
+
+export interface BlogGenerationSelection { scope: string; id: string }

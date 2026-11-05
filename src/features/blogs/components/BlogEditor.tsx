@@ -1,6 +1,8 @@
 import { useAdminNavigation } from '../../../lib/admin-navigation';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ApiError } from '../../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { blogKeys } from '../hooks/blog.keys';
 import { useBlogEditorReads } from '../hooks/useBlogReads';
 import { useSaveBlogPost, useUploadBlogCover } from '../hooks/useBlogMutations';
 import type {
@@ -11,7 +13,6 @@ import type {
   BlogDetail,
   BlogEdition,
   BlogLocale,
-  BlogOptions,
   BlogSaveInput,
 } from '../types/blogs.types';
 import { useBlogDraft } from '../context/BlogDraftContext';
@@ -60,6 +61,18 @@ function fromEdition(post: BlogDetail, edition?: BlogEdition): FormState {
     : empty(post);
 }
 
+function rebaseForms(all: Record<BlogLocale, FormState>, baseline: Record<BlogLocale, FormState>, nextSaved: Record<BlogLocale, FormState>) {
+  const next = structuredClone(all);
+  for (const lang of ['en', 'ar'] as const) {
+    for (const key of Object.keys(next[lang]) as (keyof FormState)[]) {
+      if (JSON.stringify(all[lang][key]) === JSON.stringify(baseline[lang][key])) {
+        Object.assign(next[lang], { [key]: nextSaved[lang][key] });
+      }
+    }
+  }
+  return next;
+}
+
 const LOCALES = ['en', 'ar'] as const;
 const LOCALE_NAME: Record<BlogLocale, string> = { en: 'English', ar: 'Arabic' };
 
@@ -79,7 +92,11 @@ function failureMessage(error: unknown, onExpired: () => void) {
   return 'The request failed. Your entered values are still available.';
 }
 
-export function BlogEditor({
+export function BlogEditor(props: BlogEditorProps) {
+  return <BlogEditorContent key={props.postID} {...props} />;
+}
+
+function BlogEditorContent({
   postID,
   role = 'staff',
   onExpired,
@@ -89,12 +106,13 @@ export function BlogEditor({
 }: BlogEditorProps) {
   const routerNavigation = useAdminNavigation();
   const { draft, saveForPost, clearForPost } = useBlogDraft(postID);
-  const { loadDetail, loadOptions } = useBlogEditorReads();
+  const { detail, options: optionsQuery, loadDetail, loadOptions } = useBlogEditorReads(postID);
+  const queryClient = useQueryClient();
+  const post = detail.data ?? null;
+  const options = optionsQuery.data ?? null;
   const savePost = useSaveBlogPost();
   const uploadCover = useUploadBlogCover();
   const initialDraft = useRef(draft);
-  const [post, setPost] = useState<BlogDetail | null>(null);
-  const [options, setOptions] = useState<BlogOptions | null>(null);
   const [locale, setLocale] = useState<BlogLocale>('en');
   const [forms, setForms] = useState<Record<BlogLocale, FormState> | null>(null);
   const [saved, setSaved] = useState<Record<BlogLocale, FormState> | null>(null);
@@ -105,6 +123,7 @@ export function BlogEditor({
   const [busy, setBusy] = useState<null | 'save' | 'upload' | 'lifecycle' | 'refresh'>(null);
   const [attempt, setAttempt] = useState(0);
   const refreshVersion = useRef(0);
+  const appliedPost = useRef<BlogDetail | null>(null);
   const previewTrigger = useRef<HTMLButtonElement>(null);
   const wasPreview = useRef(false);
   const operationLock = useRef(false);
@@ -127,14 +146,14 @@ export function BlogEditor({
     let active = true;
     const version = ++refreshVersion.current;
     setLoading(true);
-    Promise.all([loadDetail(postID), loadOptions()])
-      .then(([p, opts]) => {
+    Promise.all([loadDetail(postID, undefined, () => active && version === refreshVersion.current), loadOptions()])
+      .then(([p]) => {
         if (!active || version !== refreshVersion.current) return;
         const value = { en: fromEdition(p, p.en), ar: fromEdition(p, p.ar) };
-        setPost(p);
+        appliedPost.current = p;
         const stored = initialDraft.current;
-        setForms(stored?.forms ?? value);
-        setSaved(stored?.saved ?? structuredClone(value));
+        setForms(stored ? rebaseForms(stored.forms, stored.saved, value) : value);
+        setSaved(structuredClone(value));
         if (stored) {
           setLocale(stored.locale);
           setFile(stored.file);
@@ -142,7 +161,6 @@ export function BlogEditor({
           setFocalX(stored.focalX);
           setFocalY(stored.focalY);
         }
-        setOptions(opts);
         setFresh(true);
         setError('');
         setLoading(false);
@@ -155,8 +173,17 @@ export function BlogEditor({
     return () => {
       active = false;
       ++refreshVersion.current;
+      void queryClient.cancelQueries({ queryKey: blogKeys.detail(postID), exact: true });
     };
   }, [postID, attempt, loadDetail, loadOptions]);
+
+  useEffect(() => {
+    if (!post || !saved || !fresh || busy || !appliedPost.current || appliedPost.current === post) return;
+    const nextSaved = { en: fromEdition(post, post.en), ar: fromEdition(post, post.ar) };
+    appliedPost.current = post;
+    setForms((all) => all ? rebaseForms(all, saved, nextSaved) : all);
+    setSaved(nextSaved);
+  }, [post, saved, fresh, busy]);
 
   useEffect(() => {
     if (forms && saved) saveForPost(postID, { forms, saved, locale, file, rights, focalX, focalY, dirty });
@@ -259,27 +286,13 @@ export function BlogEditor({
   async function refresh(expectedRevision?: number, baseline = saved) {
     const version = ++refreshVersion.current;
     try {
-      const data = await loadDetail(currentPost.id);
+      const data = await loadDetail(currentPost.id, expectedRevision, () => version === refreshVersion.current);
       if (version !== refreshVersion.current) return;
-      if (expectedRevision !== undefined && data.aggregate_revision !== expectedRevision) {
-        throw new ApiError(409, 'BLOG_CONFLICT', 'Saved detail changed during refresh.');
-      }
       const nextSaved = { en: fromEdition(data, data.en), ar: fromEdition(data, data.ar) };
       // Rebase untouched fields only; typing during an in-flight request stays local.
-      setForms((all) => {
-        if (!all || !baseline) return all;
-        const next = structuredClone(all);
-        for (const lang of ['en', 'ar'] as const) {
-          for (const key of Object.keys(next[lang]) as (keyof FormState)[]) {
-            if (JSON.stringify(all[lang][key]) === JSON.stringify(baseline[lang][key])) {
-              Object.assign(next[lang], { [key]: nextSaved[lang][key] });
-            }
-          }
-        }
-        return next;
-      });
+      setForms((all) => all && baseline ? rebaseForms(all, baseline, nextSaved) : all);
+      appliedPost.current = data;
       setSaved(nextSaved);
-      setPost(data);
       setFresh(true);
     } catch (failure) {
       if (version !== refreshVersion.current) return;
@@ -382,7 +395,7 @@ export function BlogEditor({
     setProgress(0);
     try {
       const result = await uploadCover.mutateAsync({ id: currentPost.id, file, expectedRevision: currentPost.aggregate_revision, rights, focalX, focalY, onProgress: setProgress });
-      setPost((p) => p && { ...p, aggregate_revision: result.aggregate_revision });
+      queryClient.setQueryData<BlogDetail>(blogKeys.detail(currentPost.id), (p) => p && { ...p, aggregate_revision: result.aggregate_revision });
       setForms((all) => all && { ...all, [locale]: { ...all[locale], coverMediaID: result.media_id } });
       setFile(null);
       if (fileRef.current) fileRef.current.value = '';

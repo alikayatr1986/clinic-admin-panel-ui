@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../lib/api';
 import { authApi } from '../services/auth.service';
 import { queryClient } from '../../../lib/query-client';
+import { authKeys } from '../hooks/useAuth';
 import { galleryApi } from '../../gallery/services/gallery.service';
 import { blogsApi } from '../../blogs/services/blogs.service';
 import { AdminApp } from '../../../app/AdminApp';
@@ -26,6 +27,36 @@ function json(data: unknown, status = 200) {
 }
 
 describe('admin authentication shell', () => {
+  it('does not accept a session response after its app unmounts', async () => {
+    window.history.replaceState({}, '', '/admin/');
+    queryClient.setQueryData(authKeys.session(), null);
+    let resolveSession!: (value: { data: { username: string; role: 'staff'; expires_at: string } }) => void;
+    vi.spyOn(authApi, 'session').mockImplementation(() => new Promise((resolve) => { resolveSession = resolve; }));
+    const view = render(<AdminApp />);
+    expect(screen.getByRole('status')).toHaveTextContent('Checking staff session');
+    view.unmount();
+    resolveSession({ data: { username: 'old', role: 'staff', expires_at: '2030-01-01' } });
+    await waitFor(() => expect(queryClient.getQueryData(authKeys.session())).toBeNull());
+  });
+  it('clears cached identity and private data when initial verification returns 401', async () => {
+    window.history.replaceState({}, '', '/admin/');
+    queryClient.setQueryData(authKeys.session(), { username: 'old', role: 'staff', expires_at: '2030-01-01' });
+    queryClient.setQueryData(['private', 'record'], 'secret');
+    vi.spyOn(authApi, 'session').mockRejectedValue(new ApiError(401, 'UNAUTHORIZED', 'Expired'));
+    render(<AdminApp />);
+    expect(await screen.findByRole('heading', { name: 'Staff sign in' })).toBeVisible();
+    expect(queryClient.getQueryData(authKeys.session())).toBeNull();
+    expect(queryClient.getQueryData(['private', 'record'])).toBeUndefined();
+  });
+  it('renders updates from the authoritative session query', async () => {
+    window.history.replaceState({}, '', '/admin/');
+    vi.spyOn(authApi, 'session').mockResolvedValue({ data: { username: 'staff', role: 'staff', expires_at: '2030-01-01' } });
+    vi.spyOn(galleryApi, 'list').mockResolvedValue({ data: [], total: 0, page: 1, page_size: 1 });
+    render(<AdminApp />);
+    expect(await screen.findByText('Signed in as staff')).toBeVisible();
+    queryClient.setQueryData(authKeys.session(), { username: 'updated', role: 'staff', expires_at: '2030-01-01' });
+    expect(await screen.findByText('Signed in as updated')).toBeVisible();
+  });
   it('direct-loads a trailing-slash preview and keeps dirty editor mounted through close, back and forward', async () => {
     window.history.replaceState({}, '', '/admin/blogs/post-1/preview/');
     vi.spyOn(authApi, 'session').mockResolvedValue({ data: { username: 'staff', role: 'staff', expires_at: '2030-01-01T00:00:00Z' } });

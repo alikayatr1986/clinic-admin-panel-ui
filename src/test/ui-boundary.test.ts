@@ -29,11 +29,15 @@ const SHARED_PRIMITIVES = new Set([
   'TableCell',
   'TableCaption',
   'Dialog',
+  'DialogTrigger',
   'DialogContent',
   'DialogHeader',
   'DialogFooter',
   'DialogTitle',
   'DialogDescription',
+  'DialogClose',
+  'DialogOverlay',
+  'DialogPortal',
   'Tabs',
   'TabsList',
   'TabsTrigger',
@@ -42,7 +46,7 @@ const SHARED_PRIMITIVES = new Set([
 
 const FORBIDDEN_APPEARANCE_PATTERNS = [
   /^bg-/,
-  /^text-(?!left|right|center|start|end|justify|xs|sm|base|lg|xl|2xl)/,
+  /^text-(?!left|right|center|start|end|justify|xs|sm|base|lg|[1-9]?xl|nowrap|wrap|ellipsis|clip)/,
   /^rounded-/,
   /^border-(?!0|1|2|4|8|t|b|l|r|x|y)/,
 ];
@@ -108,9 +112,10 @@ export function findUIBoundaryViolations(
           }
 
           const tokens = classString.split(/\s+/).filter(Boolean);
-          const forbiddenTokens = tokens.filter((token) =>
-            FORBIDDEN_APPEARANCE_PATTERNS.some((pattern) => pattern.test(token))
-          );
+          const forbiddenTokens = tokens.filter((token) => {
+            const baseToken = token.replace(/^(?:[a-z0-9_[-]+:)+/, '');
+            return FORBIDDEN_APPEARANCE_PATTERNS.some((pattern) => pattern.test(baseToken));
+          });
 
           if (forbiddenTokens.length > 0) {
             violations.push({
@@ -265,6 +270,7 @@ describe('UI Boundary Structural Check', () => {
           <div>
             <button onClick={() => {}}>Raw Click</button>
             <input type="text" placeholder="Raw input" />
+            <textarea placeholder="Raw textarea" />
           </div>
         );
       }
@@ -273,11 +279,13 @@ describe('UI Boundary Structural Check', () => {
     const violations = findUIBoundaryViolations('src/features/sample/Component.tsx', snippet, {
       enforceRawControls: true,
     });
-    expect(violations.length).toBe(2);
+    expect(violations.length).toBe(3);
     expect(violations[0].type).toBe('unauthorized-raw-control');
     expect(violations[0].message).toContain('<button>');
     expect(violations[1].type).toBe('unauthorized-raw-control');
     expect(violations[1].message).toContain('<input type="text">');
+    expect(violations[2].type).toBe('unauthorized-raw-control');
+    expect(violations[2].message).toContain('<textarea>');
   });
 
   it('respects documented semantic exceptions (file input in gallery case editor, native checkbox)', () => {
@@ -328,68 +336,38 @@ describe('UI Boundary Structural Check', () => {
       ([path]) => !/\.test\.[jt]sx?$/.test(path) && !path.includes('/components/ui/')
     );
 
+    expect(productionEntries.length).toBeGreaterThan(30);
+
     const allViolations: BoundaryViolation[] = [];
     for (const [path, source] of productionEntries) {
-      const violations = findUIBoundaryViolations(path, source);
+      const normalizedPath = path.replace(/^\.\.\//, 'src/');
+      const violations = findUIBoundaryViolations(normalizedPath, source);
       allViolations.push(...violations);
     }
 
     expect(allViolations).toEqual([]);
   });
 
-  it('ensures zero unauthorized raw controls in migrated auth, app, layout, settings, blog, gallery, dashboard, and lead production files', () => {
-    const migratedFiles = [
-      'src/features/auth/components/LoginPage.tsx',
-      'src/app/AdminApp.tsx',
-      'src/components/layout/AdminShell.tsx',
-      'src/components/layout/AdminSidebar.tsx',
-      'src/features/settings/pages/SettingsPage.tsx',
-      'src/features/settings/components/SettingsTabs.tsx',
-      'src/features/settings/components/TimeframeSettingsTable.tsx',
-      'src/features/settings/components/ProcedureSettingsTable.tsx',
-      'src/features/settings/components/BlogCategorySettings.tsx',
-      'src/features/settings/components/ProcedureFormDialog.tsx',
-      'src/features/settings/components/TimeframeFormDialog.tsx',
-      'src/features/settings/components/ActivationAttestationDialog.tsx',
-      'src/features/blogs/components/BlogList.tsx',
-      'src/features/blogs/components/BlogCreateForm.tsx',
-      'src/features/blogs/components/BlogEditor.tsx',
-      'src/features/blogs/components/BlogPublishPanel.tsx',
-      'src/features/blogs/components/BlogGenerator.tsx',
-      'src/features/blogs/components/BlogGenerationReview.tsx',
-      'src/features/blogs/components/BlogPreview.tsx',
-      'src/features/blogs/pages/BlogDetailPage.tsx',
-      'src/features/blogs/pages/BlogPreviewPage.tsx',
-      'src/features/blogs/pages/BlogCreatePage.tsx',
-      'src/features/blogs/pages/BlogListPage.tsx',
-      'src/features/blogs/pages/BlogEditPage.tsx',
-      'src/features/gallery/components/GalleryCaseList.tsx',
-      'src/features/gallery/components/GalleryCaseEditor.tsx',
-      'src/features/gallery/components/GalleryContentEditor.tsx',
-      'src/features/gallery/pages/GalleryListPage.tsx',
-      'src/features/gallery/pages/GalleryDetailPage.tsx',
-      'src/features/gallery/pages/GalleryCreatePage.tsx',
-      'src/features/gallery/pages/GalleryEditPage.tsx',
-      'src/features/dashboard/components/DashboardPage.tsx',
-      'src/features/leads/components/LeadList.tsx',
-      'src/features/leads/components/LeadDetail.tsx',
-    ];
-
+  it('ensures zero unauthorized raw controls across all production TSX files in the application', () => {
     const productionFiles = import.meta.glob('../**/*.{ts,tsx}', {
       query: '?raw',
       import: 'default',
       eager: true,
     }) as Record<string, string>;
 
+    const productionEntries = Object.entries(productionFiles).filter(
+      ([path]) => !/\.test\.[jt]sx?$/.test(path) && !path.includes('/components/ui/')
+    );
+
+    expect(productionEntries.length).toBeGreaterThan(30);
+
     const allViolations: BoundaryViolation[] = [];
-    for (const [path, source] of Object.entries(productionFiles)) {
+    for (const [path, source] of productionEntries) {
       const normalizedPath = path.replace(/^\.\.\//, 'src/');
-      if (migratedFiles.includes(normalizedPath)) {
-        const violations = findUIBoundaryViolations(normalizedPath, source, {
-          enforceRawControls: true,
-        });
-        allViolations.push(...violations);
-      }
+      const violations = findUIBoundaryViolations(normalizedPath, source, {
+        enforceRawControls: true,
+      });
+      allViolations.push(...violations);
     }
 
     expect(allViolations).toEqual([]);

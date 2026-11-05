@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,7 +7,7 @@ import { blogsApi } from '../services/blogs.service';
 import { BlogGenerator } from './BlogGenerator';
 import type { BlogGenerationJob } from '../types/blogs.types';
 
-function render(element: ReactElement) { const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } }); const Wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>; return rtlRender(element, { wrapper: Wrapper }); }
+function render(element: ReactElement) { const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } }); const Wrapper = ({ children }: { children: React.ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>; return rtlRender(element, { wrapper: Wrapper }); }
 
 describe('BlogGenerator', () => {
   beforeEach(() => {
@@ -17,6 +17,7 @@ describe('BlogGenerator', () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     localStorage.clear();
   });
 
@@ -89,6 +90,88 @@ describe('BlogGenerator', () => {
 
     expect(await screen.findByText('Status: queued')).toBeInTheDocument();
     expect(localStorage.getItem('blog_gen_job_post-1_en')).toBe('job-123');
+  });
+
+  it('stores a late queued job for its original locale without replacing the current job', async () => {
+    let resolve!: (value: { data: BlogGenerationJob }) => void;
+    vi.spyOn(blogsApi, 'queueGeneration').mockReturnValue(new Promise((done) => { resolve = done; }));
+    const { rerender } = render(<BlogGenerator {...baseProps} />);
+    fireEvent.change(screen.getByPlaceholderText(/Rhinoplasty recovery timeline/i), { target: { value: 'Topic' } });
+    fireEvent.change(screen.getByPlaceholderText(/Specific guidance for style/i), { target: { value: 'Instructions' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /No patient data/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Start AI drafting for EN/i }));
+    await waitFor(() => expect(blogsApi.queueGeneration).toHaveBeenCalled());
+    rerender(<BlogGenerator {...baseProps} locale="ar" />);
+    resolve({ data: { id: 'job-old', post_id: 'post-1', language: 'en', status: 'queued', source_ids: [], created_at: '', updated_at: '' } });
+    await waitFor(() => expect(localStorage.getItem('blog_gen_job_post-1_en')).toBe('job-old'));
+    expect(screen.queryByText('Status: queued')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Start AI drafting for AR/i })).toBeInTheDocument();
+  });
+
+  it('does not show a late recovered job after changing locale', async () => {
+    localStorage.setItem('blog_gen_job_post-1_en', 'job-old');
+    let resolve!: (value: { data: BlogGenerationJob }) => void;
+    vi.spyOn(blogsApi, 'getGeneration').mockReturnValue(new Promise((done) => { resolve = done; }));
+    const { rerender } = render(<BlogGenerator {...baseProps} />);
+    await waitFor(() => expect(blogsApi.getGeneration).toHaveBeenCalled());
+    rerender(<BlogGenerator {...baseProps} locale="ar" />);
+    resolve({ data: { id: 'job-old', post_id: 'post-1', language: 'en', status: 'running', source_ids: [], created_at: '', updated_at: '' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: /Start AI drafting for AR/i })).toBeInTheDocument());
+    expect(screen.queryByText('Status: running')).not.toBeInTheDocument();
+  });
+
+  it('rejects a queued result after switching away and back to its locale', async () => {
+    let resolve!: (value: { data: BlogGenerationJob }) => void;
+    vi.spyOn(blogsApi, 'queueGeneration').mockReturnValue(new Promise((done) => { resolve = done; }));
+    const { rerender } = render(<BlogGenerator {...baseProps} />);
+    fireEvent.change(screen.getByPlaceholderText(/Rhinoplasty recovery timeline/i), { target: { value: 'Topic' } });
+    fireEvent.change(screen.getByPlaceholderText(/Specific guidance for style/i), { target: { value: 'Instructions' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /No patient data/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Start AI drafting for EN/i }));
+    await waitFor(() => expect(blogsApi.queueGeneration).toHaveBeenCalled());
+    rerender(<BlogGenerator {...baseProps} locale="ar" />);
+    rerender(<BlogGenerator {...baseProps} />);
+    await act(async () => resolve({ data: { id: 'old', post_id: 'post-1', language: 'en', status: 'queued', source_ids: [], created_at: '', updated_at: '' } }));
+    expect(screen.queryByText('Status: queued')).not.toBeInTheDocument();
+  });
+
+  it('preserves a recoverable job ID and reports restoration failure', async () => {
+    localStorage.setItem('blog_gen_job_post-1_en', 'job-retry');
+    vi.spyOn(blogsApi, 'getGeneration').mockRejectedValue(new Error('offline'));
+    render(<BlogGenerator {...baseProps} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/reopen this article to retry/i);
+    expect(localStorage.getItem('blog_gen_job_post-1_en')).toBe('job-retry');
+  });
+
+  it('polls at 2.5 second intervals and stops after 48 attempts', async () => {
+    const job: BlogGenerationJob = { id: 'job-poll', post_id: 'post-1', language: 'en', status: 'running', source_ids: [], created_at: '', updated_at: '' };
+    localStorage.setItem('blog_gen_job_post-1_en', job.id);
+    const get = vi.spyOn(blogsApi, 'getGeneration').mockResolvedValueOnce({ data: { ...job, status: 'queued' } }).mockResolvedValue({ data: job });
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    render(<BlogGenerator {...baseProps} />);
+    await screen.findByText('Status: queued');
+    await act(async () => { await vi.advanceTimersByTimeAsync(2499); });
+    expect(get).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('Status: running')).toBeInTheDocument();
+    for (let i = 1; i < 48; i++) await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+    expect(get).toHaveBeenCalledTimes(49);
+    expect(screen.getByRole('alert')).toHaveTextContent(/timed out polling/i);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(get).toHaveBeenCalledTimes(49);
+  });
+
+  it('reports polling errors without discarding the job ID', async () => {
+    const job: BlogGenerationJob = { id: 'job-poll', post_id: 'post-1', language: 'en', status: 'running', source_ids: [], created_at: '', updated_at: '' };
+    localStorage.setItem('blog_gen_job_post-1_en', job.id);
+    vi.spyOn(blogsApi, 'getGeneration').mockResolvedValueOnce({ data: job }).mockRejectedValueOnce(new Error('offline'));
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    render(<BlogGenerator {...baseProps} />);
+    await screen.findByText('Status: running');
+    await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+    expect(screen.getByRole('alert')).toHaveTextContent(/reopen this article to retry/i);
+    expect(localStorage.getItem('blog_gen_job_post-1_en')).toBe(job.id);
   });
 
   it('restores persisted job from localStorage and bounds polling (AC-10.2)', async () => {
@@ -180,10 +263,11 @@ describe('BlogGenerator', () => {
 
     // Rerender with dirty=false
     rerender(<BlogGenerator {...baseProps} dirty={false} />);
-    expect(applyBtn).toBeEnabled();
+    const activeApplyBtn = screen.getByRole('button', { name: /Apply selected/i });
+    expect(activeApplyBtn).toBeEnabled();
 
     const applySpy = vi.spyOn(blogsApi, 'applyGeneration').mockResolvedValue({ data: {} });
-    fireEvent.click(applyBtn);
+    fireEvent.click(activeApplyBtn);
 
     await waitFor(() => expect(applySpy).toHaveBeenCalledWith('post-1', 'job-success', expect.arrayContaining(['title', 'excerpt', 'body', 'seo_title', 'seo_description'])));
     expect(baseProps.onRefresh).toHaveBeenCalled();

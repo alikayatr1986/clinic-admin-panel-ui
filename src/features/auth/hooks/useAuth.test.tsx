@@ -44,3 +44,14 @@ describe('useAuth', () => {
     await expect(result.current.fetchSession()).rejects.toMatchObject({ status: 401 });
   });
 });
+
+ it('does not fetch a session when login completes after unmount', async () => {
+  const wrapper = setup();
+  let finish!: (value: { data: { session_id: string } }) => void;
+  vi.spyOn(authApi, 'login').mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  const session = vi.spyOn(authApi, 'session');
+  const hook = renderHook(() => useAuth(), { wrapper });
+  const pending = hook.result.current.login('staff', 'secret').catch(() => undefined);
+  hook.unmount(); finish({ data: { session_id: 'id' } }); await pending;
+  expect(session).not.toHaveBeenCalled();
+});

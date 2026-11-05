@@ -1,5 +1,8 @@
 import type { BlogGeneratorProps } from "../types/blogs.types";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { getSessionGeneration } from "../../../lib/session-generation";
+import { blogKeys } from "../hooks/blog.keys";
 import { ApiError } from "../../../lib/api";
 import { useBlogEditorReads } from "../hooks/useBlogReads";
 import {
@@ -12,6 +15,7 @@ import type {
   BlogGenerationBrief,
   BlogGenerationJob,
   BlogGenerationSource,
+  BlogGenerationSelection,
   BlogLocale,
 } from "../types/blogs.types";
 import { BlogGenerationReview } from "./BlogGenerationReview";
@@ -46,7 +50,37 @@ export function BlogGenerator({
   const [confirmedNoPatientData, setConfirmedNoPatientData] = useState(false);
 
   // Job & UI state
-  const [job, setJob] = useState<BlogGenerationJob | null>(null);
+  const [selection, setSelection] = useState<BlogGenerationSelection | null>(null);
+  const scope = storageKey(postID, locale);
+  const jobID = selection?.scope === scope ? selection.id : "";
+  const scopeRef = useRef(scope);
+  const scopeVersion = useRef(0);
+  if (scopeRef.current !== scope) { scopeRef.current = scope; scopeVersion.current += 1; }
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const queryClient = useQueryClient();
+  const { generation, loadGeneration } = useBlogEditorReads(postID, jobID);
+  const job = generation.data ?? null;
+  function setJob(value: BlogGenerationJob | null) {
+    if (value) {
+      queryClient.setQueryDefaults(blogKeys.generation(postID, value.id), { gcTime: 300_000 });
+      queryClient.setQueryData(blogKeys.generation(postID, value.id), value);
+      setSelection({ scope, id: value.id });
+    } else setSelection(null);
+  }
+  function current(requestScope: string, session: number, version: number) {
+    return (
+      mounted.current &&
+      scopeRef.current === requestScope &&
+      scopeVersion.current === version &&
+      getSessionGeneration() === session
+    );
+  }
   const [starting, setStarting] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [applying, setApplying] = useState(false);
@@ -57,7 +91,6 @@ export function BlogGenerator({
 
   const pollCount = useRef(0);
   const maxPolls = 48; // ~120s with 2.5s interval
-  const { loadGeneration } = useBlogEditorReads();
   const queueGeneration = useQueueBlogGeneration();
   const cancelGeneration = useCancelBlogGeneration();
   const discardGeneration = useDiscardBlogGeneration();
@@ -67,6 +100,10 @@ export function BlogGenerator({
   useEffect(() => {
     setError("");
     setFieldErrors({});
+    setStarting(false);
+    setCanceling(false);
+    setDiscarding(false);
+    setApplying(false);
     const savedJobID = localStorage.getItem(storageKey(postID, locale));
     if (!savedJobID) {
       setJob(null);
@@ -74,9 +111,11 @@ export function BlogGenerator({
     }
 
     let active = true;
-    loadGeneration(postID, savedJobID)
+    const session = getSessionGeneration();
+    const version = scopeVersion.current;
+    loadGeneration(postID, savedJobID, () => active && current(scope, session, version))
       .then((j) => {
-        if (!active) return;
+        if (!active || !current(scope, session, version)) return;
         if (j.status === "applied" || j.status === "discarded") {
           localStorage.removeItem(storageKey(postID, locale));
           setJob(null);
@@ -84,14 +123,22 @@ export function BlogGenerator({
           setJob(j);
         }
       })
-      .catch(() => {
-        if (!active) return;
-        localStorage.removeItem(storageKey(postID, locale));
-        setJob(null);
+      .catch((err) => {
+        if (!active || !current(scope, session, version)) return;
+        if (err instanceof ApiError && err.status === 404) {
+          localStorage.removeItem(storageKey(postID, locale));
+          setJob(null);
+          setError("The saved generation job no longer exists. Start a new brief.");
+        } else {
+          setError(err instanceof ApiError && err.status === 401
+            ? "Session expired while restoring generation. Please sign in again."
+            : "Could not restore generation progress. Reopen this article to retry.");
+        }
       });
 
     return () => {
       active = false;
+      void queryClient.cancelQueries({ queryKey: blogKeys.generation(postID, savedJobID), exact: true });
     };
   }, [postID, locale, loadGeneration]);
 
@@ -100,36 +147,49 @@ export function BlogGenerator({
     if (!job || (job.status !== "queued" && job.status !== "running")) return;
 
     pollCount.current = 0;
+    let active = true;
+    const session = getSessionGeneration();
+    const version = scopeVersion.current;
     const interval = setInterval(async () => {
-      pollCount.current += 1;
-      if (pollCount.current > maxPolls) {
+      if (pollCount.current >= maxPolls) {
         clearInterval(interval);
-        setError(
-          "Generation timed out polling. Please check job status or retry.",
-        );
+        setError("Generation timed out polling. Reopen this article to check the job status.");
         return;
       }
+      pollCount.current += 1;
       try {
-        const updated = await loadGeneration(postID, job.id);
+        const updated = await loadGeneration(postID, job.id, () => active && current(scope, session, version));
+        if (!active || !current(scope, session, version)) return;
         setJob(updated);
-        if (updated.status !== "queued" && updated.status !== "running") {
+        if (updated.status === "queued" || updated.status === "running") {
+          if (pollCount.current >= maxPolls) {
+            clearInterval(interval);
+            setError("Generation timed out polling. Reopen this article to check the job status.");
+          }
+        } else {
           clearInterval(interval);
           if (updated.status === "applied" || updated.status === "discarded") {
             localStorage.removeItem(storageKey(postID, locale));
           }
         }
       } catch (err) {
+        if (!active || !current(scope, session, version)) return;
         clearInterval(interval);
         if (err instanceof ApiError && err.status === 401) {
           setError(
             "Session expired while checking generation progress. Please sign in again.",
           );
+        } else {
+          setError("Could not check generation progress. Reopen this article to retry.");
         }
       }
     }, 2500);
 
-    return () => clearInterval(interval);
-  }, [postID, locale, job?.id, job?.status, loadGeneration]);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [postID, locale, job?.id, job?.status === "queued" || job?.status === "running", loadGeneration]);
 
   function addSource() {
     if (sources.length >= 10) return;
@@ -224,6 +284,9 @@ export function BlogGenerator({
       ...(clinicFacts.trim() ? { clinic_facts: clinicFacts.trim() } : {}),
     };
 
+    const requestScope = scope;
+    const session = getSessionGeneration();
+    const version = scopeVersion.current;
     setStarting(true);
     const idempotencyKey =
       typeof crypto !== "undefined" && crypto.randomUUID
@@ -238,10 +301,13 @@ export function BlogGenerator({
         baseRevision,
         brief,
       });
-      setJob(createdJob);
+      if (getSessionGeneration() !== session) return;
       localStorage.setItem(storageKey(postID, locale), createdJob.id);
+      if (!current(requestScope, session, version)) return;
+      setJob(createdJob);
       setNotice(`Generation job queued for ${locale.toUpperCase()}.`);
     } catch (err) {
+      if (!current(requestScope, session, version)) return;
       if (err instanceof ApiError) {
         if (err.code === "BLOG_BUDGET_EXHAUSTED" || err.status === 422) {
           setError(
@@ -260,44 +326,57 @@ export function BlogGenerator({
         setError("Failed to start generation. Manual text is preserved.");
       }
     } finally {
-      setStarting(false);
+      if (current(requestScope, session, version)) setStarting(false);
     }
   }
 
   async function handleCancel() {
     if (!job || canceling) return;
+    const requestScope = scope;
+    const session = getSessionGeneration();
+    const version = scopeVersion.current;
     setCanceling(true);
     setError("");
     try {
       await cancelGeneration.mutateAsync({ id: postID, jobID: job.id });
-      setJob((prev) => (prev ? { ...prev, status: "canceled" } : null));
+      if (!current(requestScope, session, version)) return;
+      setJob({ ...job, status: "canceled" });
     } catch (err) {
+      if (!current(requestScope, session, version)) return;
       if (err instanceof ApiError) setError(err.message);
       else setError("Failed to cancel generation job.");
     } finally {
-      setCanceling(false);
+      if (current(requestScope, session, version)) setCanceling(false);
     }
   }
 
   async function handleDiscard() {
     if (!job || discarding) return;
+    const requestScope = scope;
+    const session = getSessionGeneration();
+    const version = scopeVersion.current;
     setDiscarding(true);
     setError("");
     try {
       await discardGeneration.mutateAsync({ id: postID, jobID: job.id });
+      if (!current(requestScope, session, version)) return;
       localStorage.removeItem(storageKey(postID, locale));
       setJob(null);
       setNotice("Generation result discarded.");
     } catch (err) {
+      if (!current(requestScope, session, version)) return;
       if (err instanceof ApiError) setError(err.message);
       else setError("Failed to discard generation result.");
     } finally {
-      setDiscarding(false);
+      if (current(requestScope, session, version)) setDiscarding(false);
     }
   }
 
   async function handleApply(selectedFields: string[]) {
     if (!job || applying) return;
+    const requestScope = scope;
+    const session = getSessionGeneration();
+    const version = scopeVersion.current;
     setApplying(true);
     setError("");
     try {
@@ -306,13 +385,16 @@ export function BlogGenerator({
         jobID: job.id,
         selectedFields,
       });
+      if (!current(requestScope, session, version)) return;
       localStorage.removeItem(storageKey(postID, locale));
       setJob(null);
       await onRefresh();
+      if (!current(requestScope, session, version)) return;
       onApplied?.(
         `Applied generated ${selectedFields.join(", ")} as assisted draft.`,
       );
     } catch (err) {
+      if (!current(requestScope, session, version)) return;
       if (err instanceof ApiError) {
         if (err.status === 409) {
           setError(
@@ -327,7 +409,7 @@ export function BlogGenerator({
         );
       }
     } finally {
-      setApplying(false);
+      if (current(requestScope, session, version)) setApplying(false);
     }
   }
 
