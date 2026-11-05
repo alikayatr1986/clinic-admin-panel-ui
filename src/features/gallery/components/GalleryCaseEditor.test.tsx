@@ -176,4 +176,24 @@ describe('gallery case editor', () => {
     await user.type(reference, 'replacement-reference');
     expect(screen.getByLabelText(/I verified this reference/)).not.toBeChecked();
   });
+
+  it('renders dynamic active and retired timeframe options and preserves existing retired timeframe', async () => {
+    const dynamicOptions: GalleryOptions = {
+      procedures: [{ code: 'rhinoplasty', en: 'Rhinoplasty', ar: 'تجميل الأنف' }],
+      timeframes: [
+        { code: '0-3-months', en: '0–3 Months', ar: '٠-٣ أشهر', status: 'active' },
+        { code: 'old-retired', en: 'Old Period', ar: 'فترة قديمة', status: 'retired', retired: true },
+      ],
+    };
+    vi.spyOn(galleryApi, 'options').mockResolvedValue({ data: dynamicOptions });
+    vi.spyOn(galleryApi, 'get').mockResolvedValue({
+      data: { ...emptyCase, timeframe_badge: 'old-retired' },
+    });
+    render(<GalleryCaseEditor caseID="case-1" onExpired={vi.fn()} onNavigate={vi.fn()} registerBlocker={vi.fn()} />);
+
+    const select = await screen.findByLabelText('Timeframe') as HTMLSelectElement;
+    expect(select.value).toBe('old-retired');
+    expect(screen.getByRole('option', { name: '0–3 Months' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Old Period (Retired)' })).toBeInTheDocument();
+  });
 });

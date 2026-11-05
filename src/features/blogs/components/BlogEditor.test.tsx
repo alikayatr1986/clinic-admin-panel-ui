@@ -19,6 +19,14 @@ function reviewedPost(): BlogDetail {
 }
 
 describe('BlogEditor', () => {
+  it('retains the localized label of its retired category', async () => {
+    vi.spyOn(blogsApi, 'get').mockResolvedValue({ data: { ...detail, category_name_en: 'ENT Health', category_name_ar: 'صحة' } });
+    vi.spyOn(blogsApi, 'options').mockResolvedValue({ data: { ...options, categories: [] } });
+    render(<BlogEditor postID="post-1" onExpired={vi.fn()} onNavigate={vi.fn()} registerBlocker={vi.fn()} />);
+    expect(await screen.findByRole('option', { name: 'ENT Health (Retired)' })).toHaveValue('cat-1');
+    fireEvent.click(screen.getByRole('tab', { name: 'العربية' }));
+    expect(screen.getByRole('option', { name: 'صحة (Retired)' })).toHaveValue('cat-1');
+  });
   it('keeps manual authoring available when AI drafting is disabled', async () => {
     vi.spyOn(blogsApi, 'get').mockResolvedValue({ data: detail });
     vi.spyOn(blogsApi, 'options').mockResolvedValue({ data: options });

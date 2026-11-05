@@ -46,6 +46,8 @@ export interface GalleryOption {
   code: string;
   en: string;
   ar: string;
+  status?: 'draft' | 'active' | 'retired' | string;
+  retired?: boolean;
 }
 
 export interface GalleryOptions {

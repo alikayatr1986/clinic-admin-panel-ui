@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import type { RouteObject } from 'react-router-dom';
-import { DashboardRoute, NotFoundRoute, BlogListRoute, BlogCreateRoute, BlogDetailRoute, BlogEditRoute, GalleryListRoute, GalleryDetailRoute, GalleryEditorRoute, LeadListRoute, LeadDetailRoute } from './RoutePages';
+import { DashboardRoute, NotFoundRoute, BlogListRoute, BlogCreateRoute, BlogDetailRoute, BlogEditRoute, GalleryListRoute, GalleryDetailRoute, GalleryEditorRoute, LeadListRoute, LeadDetailRoute, SettingsRoute } from './RoutePages';
 
 export const adminRouteContracts: RouteObject[] = [
   { id: 'dashboard', path: '/', element: createElement(DashboardRoute) },
@@ -16,5 +16,6 @@ export const adminRouteContracts: RouteObject[] = [
   { id: 'gallery-edit', path: '/gallery/:id/edit', element: createElement(GalleryEditorRoute) },
   { id: 'lead-list', path: '/leads', element: createElement(LeadListRoute) },
   { id: 'lead-detail', path: '/leads/:id', element: createElement(LeadDetailRoute) },
+  { id: 'settings', path: '/settings', element: createElement(SettingsRoute) },
   { id: 'not-found', path: '*', element: createElement(NotFoundRoute) },
 ];

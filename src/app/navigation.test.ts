@@ -4,11 +4,11 @@ import { ADMIN_NAV_ITEMS, getNavItems, isNavItemActive } from '../components/lay
 describe('navigation configuration and active matching', () => {
   it('filters items by role', () => {
     const staffItems = getNavItems('staff');
-    expect(staffItems.map((i) => i.id)).toEqual(['dashboard', 'gallery', 'blogs']);
+    expect(staffItems.map((i) => i.id)).toEqual(['dashboard', 'gallery', 'blogs', 'settings']);
     expect(staffItems.find((i) => i.id === 'leads')).toBeUndefined();
 
     const adminItems = getNavItems('admin');
-    expect(adminItems.map((i) => i.id)).toEqual(['dashboard', 'gallery', 'blogs', 'leads']);
+    expect(adminItems.map((i) => i.id)).toEqual(['dashboard', 'gallery', 'blogs', 'leads', 'settings']);
   });
 
   it('matches dashboard only on root admin path', () => {
@@ -40,6 +40,10 @@ describe('navigation configuration and active matching', () => {
     expect(isNavItemActive(leads, '/admin/leads')).toBe(true);
     expect(isNavItemActive(leads, '/admin/leads/lead-1')).toBe(true);
     expect(isNavItemActive(leads, '/admin/gallery')).toBe(false);
+
+    const settings = ADMIN_NAV_ITEMS.find((i) => i.id === 'settings')!;
+    expect(isNavItemActive(settings, '/admin/settings')).toBe(true);
+    expect(isNavItemActive(settings, '/admin/gallery')).toBe(false);
   });
 });
 

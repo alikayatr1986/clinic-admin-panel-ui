@@ -100,6 +100,36 @@ describe('staff gallery case browser', () => {
     expect(list).toHaveBeenCalledWith({ page: 2, page_size: 12, status: 'published', timeframe_badge: 'synthetic-time' }, expect.any(AbortSignal));
   });
 
+  it('renders retired timeframe labels with (Retired) indicator in filter and card', async () => {
+    const retiredOptions: GalleryOptions = {
+      procedures: [{ code: 'proc-1', en: 'Procedure 1', ar: 'إجراء 1' }],
+      timeframes: [
+        { code: 'tf-active', en: '1 Month', ar: 'شهر واحد', status: 'active', retired: false },
+        { code: 'tf-old', en: 'Old 3 Months', ar: '3 أشهر قديمة', status: 'retired', retired: true },
+      ],
+    };
+    const historicalCase: GalleryCase = {
+      ...caseItem,
+      id: 'case-retired',
+      procedure_tag: 'proc-1',
+      timeframe_badge: 'tf-old',
+    };
+    vi.spyOn(galleryApi, 'options').mockResolvedValue({ data: retiredOptions });
+    vi.spyOn(galleryApi, 'list').mockResolvedValue({ data: [historicalCase], page: 1, page_size: 12, total: 1 });
+
+    render(<GalleryCaseList onExpired={vi.fn()} />);
+
+    // Check filter option has (Retired)
+    const timeframeSelect = await screen.findByLabelText('Timeframe');
+    expect(within(timeframeSelect).getByText('Old 3 Months (Retired)')).toBeInTheDocument();
+    expect(within(timeframeSelect).getByText('1 Month')).toBeInTheDocument();
+
+    // Check case card displays (Retired)
+    const card = await screen.findByRole('heading', { name: 'Case case-retired' });
+    const row = card.closest('li')!;
+    expect(within(row).getByText('Old 3 Months (Retired)')).toBeInTheDocument();
+  });
+
   it('shows a reset state for invalid filter codes without sending a list request', async () => {
     window.history.replaceState({}, '', '/admin/gallery?procedure_tag=unknown');
     const list = setupList();

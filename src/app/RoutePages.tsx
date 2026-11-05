@@ -10,12 +10,14 @@ import { GalleryDetailPage } from '../features/gallery/pages/GalleryDetailPage';
 import { GalleryEditPage } from '../features/gallery/pages/GalleryEditPage';
 import { LeadList } from '../features/leads/components/LeadList';
 import { LeadDetail } from '../features/leads/components/LeadDetail';
+import { SettingsPage } from '../features/settings/pages/SettingsPage';
 import type { GalleryEditorPageProps } from '../features/gallery/types/gallery.types';
 import type { RouteContext } from './route-context.types';
 
 const useRoute = () => useOutletContext<RouteContext>();
 export function DashboardRoute() { const { onExpired } = useRoute(); return <DashboardPage onExpired={onExpired} />; }
 export function NotFoundRoute() { return <p role="alert">This page could not be found.</p>; }
+export function SettingsRoute() { const c = useRoute(); return <SettingsPage role={c.session.role} onExpired={c.onExpired} />; }
 export function BlogListRoute() { const c = useRoute(); return <BlogListPage onExpired={c.onExpired} onCreate={() => c.navigate('/admin/blogs/new')} onEdit={(id) => c.navigate(`/admin/blogs/${encodeURIComponent(id)}?returnTo=${encodeURIComponent(c.blogReturn)}`)} />; }
 export function BlogCreateRoute() { const c = useRoute(); return <BlogCreatePage onExpired={c.onExpired} onCreated={(id) => c.navigate(`/admin/blogs/${encodeURIComponent(id)}/edit`)} onCancel={() => c.navigate(c.blogReturn)} />; }
 export function BlogDetailRoute() { const c = useRoute(); const { id = '' } = useParams(); return <BlogDetailPage key={id} postID={id} role={c.session.role} onExpired={c.onExpired} onEdit={(value) => c.navigate(`/admin/blogs/${encodeURIComponent(value)}/edit?returnTo=${encodeURIComponent(c.blogReturn)}`)} onPreview={(value) => c.navigate(`/admin/blogs/${encodeURIComponent(value)}/preview?returnTo=${encodeURIComponent(c.blogReturn)}`)} onBack={() => c.navigate(c.blogReturn)} onDeleted={c.onBlogDeleted} />; }

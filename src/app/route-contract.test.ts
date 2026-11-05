@@ -11,6 +11,7 @@ describe('admin route contract', () => {
     ['/admin/gallery/new', 'gallery-create'],
     ['/admin/gallery/123', 'gallery-detail'],
     ['/admin/leads/123', 'lead-detail'],
+    ['/admin/settings', 'settings'],
     ['/admin/unknown', 'not-found'],
   ])('matches %s to %s under the admin basename', (path, id) => {
     expect(matchRoutes(adminRouteContracts, path, '/admin')?.at(-1)?.route.id).toBe(id);

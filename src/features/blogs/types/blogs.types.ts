@@ -23,7 +23,7 @@ export interface BlogEdition {
 }
 export type BlogReviewKind = 'editorial' | 'medical' | 'translation' | 'media_rights';
 export interface BlogReadiness { revision_id: string | null; revision: number; required_reviews: BlogReviewKind[]; completed_reviews: BlogReviewKind[]; missing_fields: string[] }
-export interface BlogDetail extends Omit<BlogSummary, 'en_status' | 'ar_status' | 'title' | 'next_action' | 'next_action_label'> { en?: BlogEdition; ar?: BlogEdition; active_publication?: { id: string }; readiness?: Record<BlogLocale, BlogReadiness> }
+export interface BlogDetail extends Omit<BlogSummary, 'en_status' | 'ar_status' | 'title' | 'next_action' | 'next_action_label'> { category_name_en?: string; category_name_ar?: string; en?: BlogEdition; ar?: BlogEdition; active_publication?: { id: string }; readiness?: Record<BlogLocale, BlogReadiness> }
 export interface BlogHomeSettings { featured_post_id: string | null; revision: number; updated_at: string }
 export interface BlogPreviewDetail {
   id: string; slug: string; lang: BlogLocale; title: string; excerpt: string; category: { key: string; label: string };

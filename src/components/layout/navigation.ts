@@ -5,6 +5,7 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
   { id: 'gallery', label: 'Gallery', path: '/admin/gallery' },
   { id: 'blogs', label: 'Blogs', path: '/admin/blogs' },
   { id: 'leads', label: 'Leads', path: '/admin/leads', adminOnly: true },
+  { id: 'settings', label: 'Settings', path: '/admin/settings' },
 ];
 
 export function getNavItems(role: 'admin' | 'staff'): NavItem[] {

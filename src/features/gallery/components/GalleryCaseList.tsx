@@ -36,7 +36,10 @@ function parseQuery(search: string, options: GalleryOptions): GalleryParsedQuery
 
 function labelFor(code: string | undefined, items: GalleryOption[]): string {
   if (!code) return 'Not set';
-  return items.find((item) => item.code === code)?.en ?? code;
+  const found = items.find((item) => item.code === code);
+  if (!found) return code;
+  const isRetired = found.retired || found.status === 'retired';
+  return isRetired ? `${found.en} (Retired)` : found.en;
 }
 
 function requestError(error: unknown): string {
@@ -141,7 +144,7 @@ export function GalleryCaseList({ onExpired, onCreate, onEdit }: GalleryListPage
         <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-4">
           <div><label htmlFor="gallery-status" className="block text-sm font-medium">Status</label><select id="gallery-status" value={invalid ? '' : parsed?.filters.status ?? ''} onChange={(event) => changeFilter('status', event.target.value)} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2"><option value="">All statuses</option><option value="draft">Draft</option><option value="unpublished">Unpublished</option><option value="published">Published</option></select></div>
           <div><label htmlFor="gallery-procedure" className="block text-sm font-medium">Procedure</label><select id="gallery-procedure" value={invalid ? '' : parsed?.filters.procedure_tag ?? ''} onChange={(event) => changeFilter('procedure_tag', event.target.value)} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2"><option value="">All procedures</option>{options.procedures.map((item) => <option key={item.code} value={item.code}>{item.en}</option>)}</select></div>
-          <div><label htmlFor="gallery-timeframe" className="block text-sm font-medium">Timeframe</label><select id="gallery-timeframe" value={invalid ? '' : parsed?.filters.timeframe_badge ?? ''} onChange={(event) => changeFilter('timeframe_badge', event.target.value)} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2"><option value="">All timeframes</option>{options.timeframes.map((item) => <option key={item.code} value={item.code}>{item.en}</option>)}</select></div>
+          <div><label htmlFor="gallery-timeframe" className="block text-sm font-medium">Timeframe</label><select id="gallery-timeframe" value={invalid ? '' : parsed?.filters.timeframe_badge ?? ''} onChange={(event) => changeFilter('timeframe_badge', event.target.value)} className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2"><option value="">All timeframes</option>{options.timeframes.map((item) => { const isRetired = item.retired || item.status === 'retired'; return <option key={item.code} value={item.code}>{item.en}{isRetired ? ' (Retired)' : ''}</option>; })}</select></div>
           <div className="flex items-end"><button type="button" onClick={() => updateQuery(new URLSearchParams())} className="w-full rounded-md border border-slate-300 px-4 py-2 font-medium hover:bg-slate-50">Clear filters</button></div>
         </div>
         {invalid ? <div className="mt-6 rounded-xl border border-amber-200 bg-white p-6"><p role="alert" className="text-amber-900">The gallery link contains invalid filters or a page number. Reset the filters to continue.</p><button type="button" onClick={() => updateQuery(new URLSearchParams())} className="mt-4 rounded-md bg-crimson px-4 py-2 font-medium text-white">Reset filters</button></div> :
