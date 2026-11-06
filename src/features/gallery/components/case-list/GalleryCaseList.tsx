@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import type { GalleryListPageProps } from "../types/gallery.types";
+import type { GalleryListPageProps } from "../../types/gallery.types";
 import { GalleryCaseFilterBar } from "./GalleryCaseFilterBar";
 import { GalleryCaseCard } from "./GalleryCaseCard";
 import { GalleryCasePagination } from "./GalleryCasePagination";
@@ -10,7 +10,7 @@ import {
   GalleryOptionsErrorCard,
   GalleryOutOfBoundsCard,
 } from "./GalleryListStateCards";
-import { useGalleryListState } from "./useGalleryListState";
+import { useGalleryListState } from "../../hooks/useGalleryListState";
 
 const isPlain = (e: React.MouseEvent) =>
   !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0;

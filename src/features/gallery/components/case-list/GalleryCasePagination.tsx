@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import type { GalleryCasePaginationProps } from "../types/gallery.list.types";
+import type { GalleryCasePaginationProps } from "../../types/gallery.list.types";
 
 export function GalleryCasePagination({
   page,

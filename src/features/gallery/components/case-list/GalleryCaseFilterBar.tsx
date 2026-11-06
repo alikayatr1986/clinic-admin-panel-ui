@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import type { GalleryCaseFilterBarProps } from "../types/gallery.list.types";
+import type { GalleryCaseFilterBarProps } from "../../types/gallery.list.types";
 
 export function GalleryCaseFilterBar({
   options,

@@ -1,8 +1,8 @@
 import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { GalleryCardProps } from "../types/gallery.types";
-import { labelFor } from "./gallery.list.utils";
+import type { GalleryCardProps } from "../../types/gallery.types";
+import { labelFor } from "../../utils/gallery.list.utils";
 import { GalleryCaseThumbnail } from "./GalleryCaseThumbnail";
 
 export function GalleryCaseCard({ item, options, search, onEdit }: GalleryCardProps) {
