@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { GalleryThumbnailProps } from "../types/gallery.types";
+import type { GalleryThumbnailProps } from "../../types/gallery.types";
 
 export function GalleryCaseThumbnail({ item }: GalleryThumbnailProps) {
   const [broken, setBroken] = useState(false);

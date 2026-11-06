@@ -6,8 +6,8 @@ import type { GalleryDetailPageProps } from "../types/gallery.types";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { GalleryDetailActions } from "./GalleryDetailActions";
-import { GalleryDetailImage } from "./GalleryDetailImage";
+import { GalleryDetailActions } from "../components/case-detail/GalleryDetailActions";
+import { GalleryDetailImage } from "../components/case-detail/GalleryDetailImage";
 
 const isPlain = (e: React.MouseEvent) =>
   !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0;

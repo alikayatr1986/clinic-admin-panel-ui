@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { CardFooter } from "@/components/ui/card";
-import { useGalleryActions } from "../hooks/useGalleryActions";
-import type { GalleryDetailActionsProps } from "../types/gallery.detail.types";
+import { useGalleryActions } from "../../hooks/useGalleryActions";
+import type { GalleryDetailActionsProps } from "../../types/gallery.detail.types";
 
 const isPlain = (e: React.MouseEvent) =>
   !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0;

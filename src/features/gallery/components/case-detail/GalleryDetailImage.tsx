@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { GalleryDetailImageProps } from "../types/gallery.detail.types";
+import type { GalleryDetailImageProps } from "../../types/gallery.detail.types";
 
 export function GalleryDetailImage({ url, alt, beforePosition }: GalleryDetailImageProps) {
   const [broken, setBroken] = useState(false);

@@ -4,7 +4,7 @@ import type {
   GalleryErrorCardProps,
   GalleryOutOfBoundsCardProps,
   GalleryResetCardProps,
-} from "../types/gallery.list.types";
+} from "../../types/gallery.list.types";
 
 export function GalleryOptionsErrorCard({ error, onRetry }: GalleryErrorCardProps) {
   return (

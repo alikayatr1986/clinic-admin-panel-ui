@@ -1,12 +1,12 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { NavigationBoundary } from '../../../app/navigation';
+import { NavigationBoundary } from '../../../../app/navigation';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render as testingRender, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError } from '../../../lib/api';
-import { galleryApi } from '../services/gallery.service';
-import type { GalleryCase, GalleryOptions } from '../types/gallery.types';
+import { ApiError } from '../../../../lib/api';
+import { galleryApi } from '../../services/gallery.service';
+import type { GalleryCase, GalleryOptions } from '../../types/gallery.types';
 import { GalleryCaseList } from './GalleryCaseList';
 
 function render(element: React.ReactElement) {
