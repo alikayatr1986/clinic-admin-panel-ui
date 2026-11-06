@@ -74,7 +74,7 @@ export interface TimeframeReorderResponse {
   };
 }
 
-export type SettingsTabKey = 'timeframes' | 'procedures' | 'categories';
+export type SettingsTabKey = 'timeframes' | 'procedures' | 'categories' | 'verification';
 
 export interface SettingsTabsProps {
   activeTab: SettingsTabKey;

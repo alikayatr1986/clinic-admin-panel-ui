@@ -8,7 +8,7 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
       onValueChange={(val) => onTabChange(val as SettingsTabKey)}
       aria-label="Settings sections"
     >
-      <TabsList>
+      <TabsList className="h-auto w-full flex-wrap justify-start gap-y-1 sm:w-auto">
         <TabsTrigger
           value="timeframes"
           id="tab-timeframes"
@@ -30,6 +30,7 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
         >
           Blog Categories
         </TabsTrigger>
+        <TabsTrigger value="verification" id="tab-verification" aria-controls="verification-panel">Verification</TabsTrigger>
       </TabsList>
     </Tabs>
   );

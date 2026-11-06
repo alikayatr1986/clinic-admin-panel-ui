@@ -178,4 +178,81 @@ describe('staff gallery case browser', () => {
     await waitFor(() => expect(expired).toHaveBeenCalledOnce());
     expect(screen.queryByRole('heading', { name: 'Case case-1' })).not.toBeInTheDocument();
   });
+
+  it('shows out of bounds page warning and resets to first page', async () => {
+    window.history.replaceState({}, '', '/admin/gallery?page=99');
+    setupList(12);
+    const user = userEvent.setup();
+    render(<GalleryCaseList onExpired={vi.fn()} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('This page no longer has cases.');
+    await user.click(screen.getByRole('button', { name: 'Go to first page' }));
+    expect(window.location.search).toBe('');
+  });
+
+  it('displays fallback when thumbnail fails to load', async () => {
+    setupList();
+    render(<GalleryCaseList onExpired={vi.fn()} />);
+    const img = await screen.findByRole('img', { name: 'A combined clinical comparison' });
+    fireEvent.error(img);
+    expect(await screen.findByText('Image unavailable')).toBeInTheDocument();
+  });
+
+  it('disables Previous on page 1 and enables it on page 2, navigating back on click (VG-2)', async () => {
+    window.history.replaceState({}, '', '/admin/gallery?page=2');
+    const list = setupList(24);
+    const user = userEvent.setup();
+    render(<GalleryCaseList onExpired={vi.fn()} />);
+
+    await screen.findByRole('heading', { name: 'Case case-1' });
+    const prevButton = screen.getByRole('button', { name: 'Previous' });
+    expect(prevButton).toBeEnabled();
+
+    await user.click(prevButton);
+    await waitFor(() => expect(window.location.search).toBe(''));
+    expect(list).toHaveBeenLastCalledWith({ page: 1, page_size: 12 }, expect.any(AbortSignal));
+  });
+
+  it('disables Previous button on page 1 boundary (VG-2)', async () => {
+    setupList(24);
+    render(<GalleryCaseList onExpired={vi.fn()} />);
+    await screen.findByRole('heading', { name: 'Case case-1' });
+    expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+  });
+
+  it('renders before/after orientation overlays according to before_position (VG-3)', async () => {
+    const leftCase: GalleryCase = { ...caseItem, id: 'case-left', before_position: 'left' };
+    const rightCase: GalleryCase = { ...caseItem, id: 'case-right', before_position: 'right' };
+    vi.spyOn(galleryApi, 'options').mockResolvedValue({ data: options });
+    vi.spyOn(galleryApi, 'list').mockResolvedValue({ data: [leftCase, rightCase], page: 1, page_size: 12, total: 2 });
+
+    render(<GalleryCaseList onExpired={vi.fn()} />);
+
+    const leftHeading = await screen.findByRole('heading', { name: 'Case case-left' });
+    const leftCard = leftHeading.closest('li')!;
+    const leftOverlay = leftCard.querySelector('.absolute.inset-x-0.bottom-0')!;
+    expect(leftOverlay.children[0]).toHaveTextContent('Before');
+    expect(leftOverlay.children[1]).toHaveTextContent('After');
+
+    const rightHeading = await screen.findByRole('heading', { name: 'Case case-right' });
+    const rightCard = rightHeading.closest('li')!;
+    const rightOverlay = rightCard.querySelector('.absolute.inset-x-0.bottom-0')!;
+    expect(rightOverlay.children[0]).toHaveTextContent('After');
+    expect(rightOverlay.children[1]).toHaveTextContent('Before');
+  });
+
+  it('displays rejected filters message when server responds with 400 (VG-4)', async () => {
+    vi.spyOn(galleryApi, 'options').mockResolvedValue({ data: options });
+    vi.spyOn(galleryApi, 'list').mockRejectedValue(new ApiError(400, 'BAD_REQUEST', 'Rejected'));
+    render(<GalleryCaseList onExpired={vi.fn()} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('The gallery filters were rejected. Clear them and try again.');
+  });
+
+  it('preserves active filters in Create case returnTo link for modified clicks', async () => {
+    window.history.replaceState({}, '', '/admin/gallery?status=published');
+    setupList();
+    render(<GalleryCaseList onExpired={vi.fn()} onCreate={vi.fn()} />);
+    const link = await screen.findByRole('link', { name: 'Create case' });
+    expect(link.getAttribute('href')).toBe('/admin/gallery/new?returnTo=%2Fadmin%2Fgallery%3Fstatus%3Dpublished');
+  });
 });

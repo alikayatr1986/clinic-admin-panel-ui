@@ -5,6 +5,7 @@ import { BlogCategorySettings } from '../components/BlogCategorySettings';
 import { ActivationAttestationDialog } from '../components/ActivationAttestationDialog';
 import { ProcedureFormDialog } from '../components/ProcedureFormDialog';
 import { ProcedureSettingsTable } from '../components/ProcedureSettingsTable';
+import { VerificationSettings } from '../components/VerificationSettings';
 import { SettingsTabs } from '../components/SettingsTabs';
 import { TimeframeFormDialog } from '../components/TimeframeFormDialog';
 import { TimeframeSettingsTable } from '../components/TimeframeSettingsTable';
@@ -214,7 +215,7 @@ export function SettingsPage({ role = 'admin', onExpired }: SettingsPageProps) {
           </p>
         </div>
 
-        {isAdmin && activeTab !== 'categories' && (
+        {isAdmin && activeTab !== 'categories' && activeTab !== 'verification' && (
           <Button
             type="button"
             onClick={() => {
@@ -269,6 +270,8 @@ export function SettingsPage({ role = 'admin', onExpired }: SettingsPageProps) {
           />
         </div>
       )}
+
+      <div id="verification-panel" role="tabpanel" aria-labelledby="tab-verification" hidden={activeTab !== 'verification'}><VerificationSettings role={role} onExpired={onExpired} /></div>
 
       {activeTab === 'categories' && <div id="categories-panel" role="tabpanel" aria-labelledby="tab-categories"><BlogCategorySettings role={role} onExpired={onExpired} /></div>}
 

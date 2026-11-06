@@ -52,5 +52,8 @@ describe('SettingsTabs', () => {
 
     await user.keyboard('{ArrowRight}');
     expect(screen.getByRole('tab', { name: 'Blog Categories' })).toHaveFocus();
+
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'Verification' })).toHaveFocus();
   });
 });
