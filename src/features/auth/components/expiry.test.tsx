@@ -25,7 +25,7 @@ import type { AdminShellProps } from '../types/auth.types';
 import { NavigationBoundary } from '../../../app/navigation';
 import { adminRouteContracts } from '../../../app/route-contract';
 
-vi.mock('../../gallery/components/GalleryCaseEditor', () => ({
+vi.mock('../../gallery/components/case-editor/GalleryCaseEditor', () => ({
   GalleryCaseEditor: ({ onExpired }: Pick<AdminShellProps, 'onExpired'>) => {
     const { draft, saveDraft } = useBlogDraft('test');
     return <><label>Local draft<input value={draft?.rights ?? ''} onChange={(event) => saveDraft({ rights: event.target.value, dirty: true } as BlogDraftRecord)} /></label><button onClick={() => { onExpired(); onExpired(); }}>Expire twice</button></>;

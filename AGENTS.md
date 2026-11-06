@@ -23,6 +23,15 @@ Next.js app's components, tooling, or runtime are available here.
   Put types in dedicated `*.types.ts` files, not TSX. Use the existing API and
   TanStack Query patterns; do not introduce a competing transport or duplicate
   server state in local state.
+- **Component grouping and folder separation:** When a component is decomposed
+  into subcomponents related only to each other (e.g. form cards, sections,
+  field groups, dialogs, headers, or state cards specific to that parent view),
+  group them in a dedicated subfolder under `src/features/<feature>/components/<group>/`.
+  Do not dump non-shared subcomponents flat into the root `components/` folder.
+  Only genuinely shared components remain directly under `components/`.
+  Move all custom hooks to `hooks/`, types to `types/`, Zod schemas to `schemas/`,
+  and helpers to `utils/` within the feature. Never leave hooks, schemas, or utils
+  in `components/`.
 - Write readable, maintainable code: small cohesive components, descriptive names,
   explicit error handling, and no duplicated business logic or speculative
   abstractions. Keep dependencies and changes proportional to the task.

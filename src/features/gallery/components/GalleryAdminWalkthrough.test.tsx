@@ -23,6 +23,8 @@ const initialCase: GalleryCase = {
   display_order: 1,
   crop_attested: false,
   media_ready: false,
+  width: 1200,
+  height: 800,
   captions: [],
   created_at: '2026-11-06T00:00:00Z',
   updated_at: '2026-11-06T00:00:00Z',
@@ -78,10 +80,24 @@ describe('gallery admin end-to-end journey walkthrough', () => {
         revision: 2,
         media_ready: true,
         crop_attested: true,
+        width: 1200,
+        height: 800,
         url: '/api/v1/gallery/case-101/media/display',
         thumbnail_url: '/api/v1/gallery/case-101/media/thumbnail',
       };
-      return { data: currentCase };
+      return {
+        data: {
+          id: currentCase.id,
+          revision: currentCase.revision,
+          published: currentCase.published,
+          display_order: currentCase.display_order,
+          media_ready: currentCase.media_ready,
+          width: 1200,
+          height: 800,
+          url: currentCase.url ?? '/api/v1/gallery/case-101/media/display',
+          thumbnail_url: currentCase.thumbnail_url ?? '/api/v1/gallery/case-101/media/thumbnail',
+        },
+      };
     });
     const editSpy = vi.spyOn(galleryApi, 'edit').mockImplementation(async (_id, payload) => {
       currentCase = {
@@ -90,7 +106,7 @@ describe('gallery admin end-to-end journey walkthrough', () => {
         signed_consent_id: payload.signed_consent_id,
         procedure_tag: payload.procedure_tag,
         timeframe_badge: payload.timeframe_badge,
-        before_position: payload.before_position,
+        before_position: (payload.before_position === 'left' || payload.before_position === 'right') ? payload.before_position : undefined,
         captions: payload.captions ?? [],
       };
       return { data: currentCase };
