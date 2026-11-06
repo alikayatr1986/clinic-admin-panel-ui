@@ -12,7 +12,7 @@ import { GalleryEditPage } from '../features/gallery/pages/GalleryEditPage';
 import { LeadList } from '../features/leads/components/LeadList';
 import { LeadDetail } from '../features/leads/components/LeadDetail';
 import { SettingsPage } from '../features/settings/pages/SettingsPage';
-import type { GalleryEditorPageProps } from '../features/gallery/types/gallery.types';
+import type { GalleryEditorPageProps } from '../features/gallery/types/gallery.case-editor.types';
 import type { RouteContext } from './route-context.types';
 
 const useRoute = () => useOutletContext<RouteContext>();

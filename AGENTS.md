@@ -26,6 +26,12 @@ Next.js app's components, tooling, or runtime are available here.
 - Write readable, maintainable code: small cohesive components, descriptive names,
   explicit error handling, and no duplicated business logic or speculative
   abstractions. Keep dependencies and changes proportional to the task.
+- New and changed admin forms use React Hook Form, Zod, and `zodResolver` from
+  `@hookform/resolvers/zod`. Keep Zod schemas feature-owned. Map server field
+  errors with the shared `fieldErrors` helper; `ApiError.fields` stays
+  `Record<string, string>` and the server remains authoritative. Do not make a
+  client schema stricter than the server, and do not migrate forms that the
+  current change did not touch.
 
 ## State ownership and rendering
 

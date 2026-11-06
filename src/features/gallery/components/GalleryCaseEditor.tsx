@@ -1,593 +1,90 @@
-import type { GalleryPreviewState } from '../types/gallery.types';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { ApiError } from '../../../lib/api';
-import { useGalleryActions, useGalleryCase, useGalleryOptions } from '../hooks/useGallery';
-import type {
-  GalleryCase,
-  GalleryCaption,
-  GalleryEdit,
-  GalleryOptions,
-  GalleryEditorPageProps,
-  GalleryLocale as Locale,
-  GalleryCaptionForm as CaptionForm,
-  GalleryEditorForm as EditorForm,
-  GalleryBusy as Busy,
-  GalleryFieldErrorProps,
-} from '../types/gallery.types';
-import { Card, CardTitle, CardDescription } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-
-function formFromCase(item: GalleryCase): EditorForm {
-  function caption(lang: Locale): CaptionForm {
-    const value = item.captions.find((entry) => entry.lang === lang);
-    return { altText: value?.alt_text ?? '', caption: value?.caption ?? '', approved: value?.approval === 'approved' };
-  }
-  return {
-    signedConsentID: item.signed_consent_id ?? '',
-    consentVerified: Boolean(item.signed_consent_id),
-    procedureTag: item.procedure_tag ?? '',
-    timeframeBadge: item.timeframe_badge ?? '',
-    beforePosition: item.before_position ?? '',
-    cropAttested: item.crop_attested,
-    displayOrder: String(item.display_order),
-    captions: { en: caption('en'), ar: caption('ar') },
-  };
-}
-
-function isClinicalChange(current: EditorForm, saved: EditorForm): boolean {
-  return current.signedConsentID !== saved.signedConsentID ||
-    current.procedureTag !== saved.procedureTag || current.timeframeBadge !== saved.timeframeBadge ||
-    current.beforePosition !== saved.beforePosition || current.cropAttested !== saved.cropAttested ||
-    JSON.stringify(current.captions) !== JSON.stringify(saved.captions);
-}
-
-function toEdit(form: EditorForm, item: GalleryCase): GalleryEdit {
-  const captions: GalleryCaption[] = (['en', 'ar'] as const).filter((lang) => {
-    const value = form.captions[lang];
-    return Boolean(value.altText || value.caption || value.approved || item.captions.some((entry) => entry.lang === lang));
-  }).map((lang) => ({
-    lang,
-    alt_text: form.captions[lang].altText,
-    caption: form.captions[lang].caption,
-    approval: form.captions[lang].approved ? 'approved' : 'draft',
-  }));
-  return {
-    expected_revision: item.revision,
-    signed_consent_id: form.signedConsentID,
-    consent_verified: form.consentVerified,
-    procedure_tag: form.procedureTag,
-    timeframe_badge: form.timeframeBadge,
-    before_position: form.beforePosition,
-    crop_attested: form.cropAttested,
-    display_order: Number(form.displayOrder),
-    captions,
-  };
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.status === 409) return 'This case changed elsewhere. Your edits are still here. Copy them before reloading.';
-    if (error.status === 403) return 'Access denied. Check your staff permissions or sign in again.';
-    if (error.status === 422) return 'Publication requirements are not met. Review the fields below.';
-    return error.message;
-  }
-  return 'The request could not be completed. Try again.';
-}
-
-function FieldError({ name, errors }: GalleryFieldErrorProps) {
-  return errors[name] ? <p className="mt-1 text-sm text-red-800">{errors[name]}</p> : null;
-}
+import { useGalleryCase, useGalleryOptions } from '../hooks/useGallery';
+import type { GalleryEditorPageProps, GalleryEditorForm } from '../types/gallery.case-editor.types';
+import { caseEditorSchema, DEFAULT_EDITOR_VALUES } from './gallery.case-editor.schema';
+import { bannerFor, formFromCase } from './gallery.case-editor.utils';
+import { useCaseEditorActions } from './useCaseEditorActions';
+import { useEditorBlocker } from './useEditorBlocker';
+import { GalleryEditorStateCards } from './GalleryEditorStateCards';
+import { GalleryEditorHeader } from './GalleryEditorHeader';
+import { GalleryEditorFormCard } from './GalleryEditorFormCard';
+import { GalleryImageCard } from './GalleryImageCard';
+import { GalleryPublishCard } from './GalleryPublishCard';
 
 export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlocker }: GalleryEditorPageProps) {
-  const optionsQuery = useGalleryOptions();
-  const caseQuery = useGalleryCase(caseID);
-  const actions = useGalleryActions();
-  const [item, setItem] = useState<GalleryCase | null>(null);
-  const [options, setOptions] = useState<GalleryOptions | null>(null);
-  const [form, setForm] = useState<EditorForm | null>(null);
-  const [loading, setLoading] = useState(caseID !== 'new');
-  const [loadError, setLoadError] = useState('');
-  
-  const [busy, setBusy] = useState<Busy>(null);
-  const [error, setError] = useState('');
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [notice, setNotice] = useState('');
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [preview, setPreview] = useState<GalleryPreviewState | null>(null);
-  const [imageBroken, setImageBroken] = useState(false);
-  const fileInput = useRef<HTMLInputElement>(null);
+  const oq = useGalleryOptions(), cq = useGalleryCase(caseID);
+  const item = cq.data?.data ?? null, options = oq.data?.data ?? null;
+  const loading = oq.isLoading || (caseID !== 'new' && cq.isLoading);
+  const loadedIdRef = useRef<string | null>(null);
 
-  const formDirty = Boolean(item && form && JSON.stringify(form) !== JSON.stringify(formFromCase(item)));
-  const dirty = formDirty || Boolean(pendingFile);
-  const clinicalDirty = Boolean(item?.published && form && isClinicalChange(form, formFromCase(item)));
+  const { register, control, handleSubmit, reset, setValue, formState: { isDirty, errors } } =
+    useForm<GalleryEditorForm>({ resolver: zodResolver(caseEditorSchema), defaultValues: DEFAULT_EDITOR_VALUES });
 
-  useEffect(() => {
-    if (optionsQuery.error || caseQuery.error) {
-      const failure = optionsQuery.error || caseQuery.error;
-      if (failure instanceof ApiError && failure.status === 401) onExpired();
-      else { setLoadError(errorMessage(failure)); setLoading(false); }
-      return;
-    }
-    if (!optionsQuery.data || (caseID !== 'new' && !caseQuery.data)) return;
-    const choices = optionsQuery.data.data;
-    if (!Array.isArray(choices?.procedures) || !Array.isArray(choices?.timeframes)) { setLoadError('Invalid options response'); setLoading(false); return; }
-    setLoadError('');
-    setOptions(choices);
-    if (caseQuery.data && !item) { setItem(caseQuery.data.data); setForm(formFromCase(caseQuery.data.data)); }
-    setLoading(false);
-  }, [caseID, optionsQuery.data, optionsQuery.error, caseQuery.data, caseQuery.error]);
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+
+  const h = useCaseEditorActions({
+    item,
+    getIsDirty: () => isDirtyRef.current,
+    reset,
+    onExpired,
+    onNavigate,
+    refetchCase: async () => (await cq.refetch()).data?.data ?? null,
+  });
+
+  const beforePosition = useWatch({ control, name: 'beforePosition' });
+  const dirty = isDirty || Boolean(h.pendingFile);
 
   useEffect(() => {
-    const blocker = dirty || busy ? () => window.confirm('You have unsaved changes or an operation in progress. Leave this case?') : null;
-    registerBlocker(blocker);
-    const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!dirty && !busy) return;
-      event.preventDefault();
-      event.returnValue = '';
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => { registerBlocker(null); window.removeEventListener('beforeunload', onBeforeUnload); };
-  }, [dirty, busy, registerBlocker]);
-
-  function handleFailure(failure: unknown) {
-    if (failure instanceof ApiError && failure.status === 401) { onExpired(); return; }
-    setError(errorMessage(failure));
-    setFields(failure instanceof ApiError ? failure.fields ?? {} : {});
-  }
-
-  async function createDraft() {
-    if (busy) return;
-    setBusy('create'); setError(''); setNotice('');
-    try {
-      const response = await actions.create.mutateAsync();
-      onNavigate('editor', { id: response.data.id, replace: true, bypassBlock: true });
-    } catch (failure) { handleFailure(failure); }
-    finally { setBusy(null); }
-  }
-
-  function update<K extends keyof EditorForm>(key: K, value: EditorForm[K]) {
-    setForm((current) => current ? { ...current, [key]: value } : current);
-    setNotice(''); setPreview(null);
-  }
-
-  function updateConsentReference(value: string) {
-    setForm((current) => current ? {
-      ...current,
-      signedConsentID: value,
-      consentVerified: value === (item?.signed_consent_id ?? '') && Boolean(value),
-    } : current);
-    setNotice(''); setPreview(null);
-  }
-
-  function updateCaption(lang: Locale, key: keyof CaptionForm, value: string | boolean) {
-    setForm((current) => current ? {
-      ...current, captions: { ...current.captions, [lang]: { ...current.captions[lang], [key]: value } },
-    } : current);
-    setNotice(''); setPreview(null);
-  }
-
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!item || !form || busy) return;
-    const displayOrder = Number(form.displayOrder);
-    if (!Number.isSafeInteger(displayOrder) || displayOrder < -2147483648 || displayOrder > 2147483647) {
-      setFields({ display_order: 'Enter a whole display order number.' });
-      setError('Check the highlighted field.');
-      return;
+    if (item && loadedIdRef.current !== item.id) {
+      loadedIdRef.current = item.id;
+      reset(formFromCase(item));
     }
-    if (clinicalDirty && !window.confirm('Saving clinical details or descriptions will unpublish this case and reset relevant approvals. Continue?')) return;
-    setBusy('save'); setError(''); setFields({}); setNotice('');
-    try {
-      const response = await actions.edit.mutateAsync({ id: item.id, input: toEdit(form, item) });
-      const returned = response.data;
-      const approvalReset = (['en', 'ar'] as const).some((lang) => form.captions[lang].approved && returned.captions.find((caption) => caption.lang === lang)?.approval !== 'approved');
-      setItem(returned); setForm(formFromCase(returned)); setPreview(null);
-      setNotice(approvalReset ? 'Saved. Changed descriptions are drafts; review them and save approval again before publishing.' : 'Case saved.');
-    } catch (failure) { handleFailure(failure); }
-    finally { setBusy(null); }
-  }
+  }, [item, reset]);
 
-  async function upload() {
-    if (!item || !pendingFile || busy) return;
-    if (item.published && !window.confirm('Replacing this image will unpublish the case and reset reviews. Continue?')) return;
-    setBusy('upload'); setError(''); setFields({}); setNotice(''); setProgress(0);
-    try {
-      const response = await actions.upload.mutateAsync({ id: item.id, file: pendingFile, revision: item.revision, progress: setProgress });
-      setItem((current) => current ? { ...current, ...response.data } : current);
-      setPendingFile(null); if (fileInput.current) fileInput.current.value = '';
-      setPreview(null); setProgress(100); setImageBroken(false);
-      setNotice('Upload complete. Review the new image and save any pending form changes.');
-      try {
-        const refreshed = await caseQuery.refetch().then((result) => { if (!result.data) throw result.error; return result.data; });
-        setItem(refreshed.data);
-        const hasUnsavedForm = form && JSON.stringify(form) !== JSON.stringify(formFromCase(item));
-        if (!hasUnsavedForm) setForm(formFromCase(refreshed.data));
-      } catch (failure) { handleFailure(failure); }
-    } catch (failure) { handleFailure(failure); }
-    finally { setBusy(null); }
-  }
+  const queryError = oq.error || (caseID !== 'new' ? cq.error : null);
+  useEffect(() => {
+    if (queryError instanceof ApiError && queryError.status === 401) onExpired();
+  }, [queryError, onExpired]);
 
-  async function issuePreview() {
-    if (!item || busy) return;
-    if (dirty) { setError('Save changes and upload the selected image before generating a preview.'); return; }
-    setBusy('preview'); setError(''); setFields({}); setPreview(null);
-    try {
-      const response = await actions.preview.mutateAsync({ id: item.id, revision: item.revision });
-      setPreview(response.data);
-    } catch (failure) { handleFailure(failure); }
-    finally { setBusy(null); }
-  }
+  const loadError = queryError ? bannerFor(queryError) : (!options && !loading ? 'Invalid options response' : '');
+  useEditorBlocker(dirty || Boolean(h.busy), registerBlocker);
 
-  async function setPublished(published: boolean) {
-    if (!item || busy) return;
-    if (dirty) { setError('Save changes and upload the selected image before changing publication.'); return; }
-    setBusy('publish'); setError(''); setFields({}); setNotice('');
-    try {
-      const response = await actions.publish.mutateAsync({ id: item.id, revision: item.revision, published });
-      setItem(response.data); setForm(formFromCase(response.data)); setPreview(null);
-      setNotice(published ? 'Case published.' : 'Case unpublished.');
-    } catch (failure) { handleFailure(failure); }
-    finally { setBusy(null); }
-  }
-
-  if (loading) return <p role="status" className="mt-8">Loading case editor…</p>;
-  if (loadError)
+  if (loading || loadError || caseID === 'new' || !item || !options) {
     return (
-      <Card className="mt-8 p-6">
-        <p role="alert">{loadError}</p>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => { void optionsQuery.refetch(); void caseQuery.refetch(); }}
-          className="mt-4"
-        >
-          Retry
-        </Button>
-      </Card>
+      <GalleryEditorStateCards
+        loading={loading} loadError={loadError} caseID={caseID} item={item} busy={h.busy} error={h.error}
+        onRetry={() => { void oq.refetch(); if (caseID !== 'new') void cq.refetch(); }}
+        onCreateDraft={() => void h.createDraft()}
+      />
     );
-  if (!options) return null;
-  if (caseID === 'new')
-    return (
-      <Card className="mt-8 p-6">
-        <CardTitle className="text-xl">Create a draft case</CardTitle>
-        <CardDescription className="mt-2">
-          A draft stays private until the clinic reviews and publishes it.
-        </CardDescription>
-        {error && <p role="alert" className="mt-4 text-red-800">{error}</p>}
-        <Button
-          type="button"
-          variant="default"
-          disabled={busy !== null}
-          onClick={() => void createDraft()}
-          className="mt-5"
-        >
-          {busy ? 'Creating…' : 'Create draft'}
-        </Button>
-      </Card>
-    );
-  if (!item || !form) return <p role="alert" className="mt-8">Case data is unavailable.</p>;
+  }
 
   return (
     <div className="mt-8 space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="break-all text-sm text-slate-600">
-          Case {item.id} · Revision {item.revision} · {item.published ? 'Published' : 'Unpublished'}
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => onNavigate('gallery')}
-        >
-          Back to gallery
-        </Button>
-      </div>
-      {clinicalDirty && (
-        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-4 text-amber-900">
-          Saving clinical details or descriptions will unpublish this case and reset relevant approvals.
-        </p>
-      )}
-      {dirty && <p role="status" className="text-sm font-medium text-amber-900">You have unsaved changes.</p>}
-      {error && (
-        <div role="alert" className="rounded-md border border-red-200 bg-red-50 p-4 text-red-900">
-          <p>{error}</p>
-          {Object.entries(fields).length > 0 && (
-            <ul className="mt-2 list-inside list-disc">
-              {Object.entries(fields).map(([key, value]) => <li key={key}>{key}: {value}</li>)}
-            </ul>
-          )}
-        </div>
-      )}
-      {notice && <p role="status" className="rounded-md border border-green-200 bg-green-50 p-4 text-green-900">{notice}</p>}
-
-      <Card aria-label="Combined image" className="p-6">
-        <CardTitle className="text-xl">Combined before/after image</CardTitle>
-        <CardDescription className="mt-2">
-          Select one combined JPEG, PNG, or WebP image. The clinic server validates and prepares it without splitting the original composition.
-        </CardDescription>
-        {item.media_ready && item.url && !imageBroken ? (
-          <div className="relative mt-5 overflow-hidden rounded-lg bg-slate-100">
-            <img
-              src={item.url}
-              alt={item.captions.find((caption) => caption.lang === 'en')?.alt_text || 'Combined before and after clinical image'}
-              width={item.width || undefined}
-              height={item.height || undefined}
-              onError={() => setImageBroken(true)}
-              className="max-h-[36rem] w-full object-contain"
-            />
-            {form.beforePosition && (
-              <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/70 to-transparent px-4 pb-3 pt-8 text-sm font-semibold text-white">
-                <span>{form.beforePosition === 'left' ? 'Before' : 'After'}</span>
-                <span>{form.beforePosition === 'right' ? 'Before' : 'After'}</span>
-              </div>
-            )}
-          </div>
-        ) : (
-          <p className="mt-5 rounded-lg bg-slate-100 p-6 text-center text-slate-600">
-            {imageBroken ? 'Image preview unavailable.' : 'No image uploaded yet.'}
-          </p>
-        )}
-        <div className="mt-5 flex flex-wrap items-end gap-4">
-          <div>
-            <Label htmlFor="combined-image" className="block text-sm font-medium">
-              Combined image file
-            </Label>
-            <input
-              ref={fileInput}
-              id="combined-image"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              disabled={busy !== null}
-              onChange={(event) => {
-                setPendingFile(event.target.files?.[0] ?? null);
-                setProgress(0);
-                setError('');
-              }}
-              className="mt-2 block max-w-full text-sm"
-            />
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={busy !== null || !pendingFile}
-            onClick={() => void upload()}
-          >
-            {busy === 'upload' ? 'Uploading…' : pendingFile ? 'Upload image' : 'Choose an image'}
-          </Button>
-        </div>
-        {pendingFile && <p className="mt-2 text-sm">Selected: {pendingFile.name}</p>}
-        {busy === 'upload' && (
-          <div className="mt-4">
-            <Label htmlFor="upload-progress" className="block text-sm">
-              Uploading image: {progress}%
-            </Label>
-            <progress id="upload-progress" max="100" value={progress} className="mt-2 w-full" />
-          </div>
-        )}
-      </Card>
-
-      <form onSubmit={(event) => void save(event)} className="space-y-6">
-        <Card className="p-6">
-          <CardTitle className="text-xl">Consent and case details</CardTitle>
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Label htmlFor="signed-consent" className="block text-sm font-medium">
-                Signed consent reference
-              </Label>
-              <Input
-                id="signed-consent"
-                value={form.signedConsentID}
-                onChange={(event) => updateConsentReference(event.target.value)}
-                className="mt-2"
-              />
-              <FieldError name="signed_consent_id" errors={fields} />
-            </div>
-            <Label className="flex items-start gap-3 sm:col-span-2">
-              <input
-                type="checkbox"
-                checked={form.consentVerified}
-                onChange={(event) => update('consentVerified', event.target.checked)}
-                className="mt-1"
-              />
-              <span>I verified this reference against the clinic-held signed permission.</span>
-            </Label>
-            <FieldError name="consent_verified" errors={fields} />
-            <div>
-              <Label htmlFor="procedure-tag" className="block text-sm font-medium">
-                Procedure
-              </Label>
-              <select
-                id="procedure-tag"
-                value={form.procedureTag}
-                onChange={(event) => update('procedureTag', event.target.value)}
-                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-              >
-                <option value="">Choose procedure</option>
-                {options.procedures.map((choice) => (
-                  <option key={choice.code} value={choice.code}>
-                    {choice.en}
-                  </option>
-                ))}
-              </select>
-              <FieldError name="procedure_tag" errors={fields} />
-            </div>
-            <div>
-              <Label htmlFor="timeframe-badge" className="block text-sm font-medium">
-                Timeframe
-              </Label>
-              <select
-                id="timeframe-badge"
-                value={form.timeframeBadge}
-                onChange={(event) => update('timeframeBadge', event.target.value)}
-                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-              >
-                <option value="">Choose timeframe</option>
-                {options.timeframes.map((choice) => {
-                  const isRetired = choice.retired || choice.status === 'retired';
-                  return (
-                    <option key={choice.code} value={choice.code}>
-                      {choice.en}
-                      {isRetired ? ' (Retired)' : ''}
-                    </option>
-                  );
-                })}
-                {form.timeframeBadge && !options.timeframes.some((choice) => choice.code === form.timeframeBadge) && (
-                  <option key={form.timeframeBadge} value={form.timeframeBadge}>
-                    {form.timeframeBadge} (Retired)
-                  </option>
-                )}
-              </select>
-              <FieldError name="timeframe_badge" errors={fields} />
-            </div>
-            <div>
-              <Label htmlFor="before-position" className="block text-sm font-medium">
-                Before image position
-              </Label>
-              <select
-                id="before-position"
-                value={form.beforePosition}
-                onChange={(event) => update('beforePosition', event.target.value as EditorForm['beforePosition'])}
-                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-              >
-                <option value="">Choose side</option>
-                <option value="left">Left</option>
-                <option value="right">Right</option>
-              </select>
-              <FieldError name="before_position" errors={fields} />
-            </div>
-            <div>
-              <Label htmlFor="display-order" className="block text-sm font-medium">
-                Display order
-              </Label>
-              <Input
-                id="display-order"
-                type="number"
-                step="1"
-                value={form.displayOrder}
-                onChange={(event) => update('displayOrder', event.target.value)}
-                className="mt-2"
-              />
-              <FieldError name="display_order" errors={fields} />
-            </div>
-            <Label className="flex items-start gap-3 sm:col-span-2">
-              <input
-                type="checkbox"
-                checked={form.cropAttested}
-                onChange={(event) => update('cropAttested', event.target.checked)}
-                className="mt-1"
-              />
-              <span>I reviewed image orientation, before/after identity, and publication suitability.</span>
-            </Label>
-            <FieldError name="crop_attested" errors={fields} />
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <CardTitle className="text-xl">Bilingual image descriptions</CardTitle>
-          <CardDescription className="mt-2">
-            Save changed descriptions as drafts, then review and approve them in a second save before publishing.
-          </CardDescription>
-          <div className="mt-5 grid gap-6 lg:grid-cols-2">
-            {(['en', 'ar'] as const).map((lang) => (
-              <Card key={lang} className="p-4">
-                <h3 className="font-semibold">{lang === 'en' ? 'English' : 'Arabic'}</h3>
-                <div className="mt-3">
-                  <Label htmlFor={`${lang}-alt`} className="block text-sm font-medium">
-                    {lang.toUpperCase()} image description
-                  </Label>
-                  <Textarea
-                    id={`${lang}-alt`}
-                    lang={lang}
-                    dir={lang === 'ar' ? 'rtl' : 'ltr'}
-                    value={form.captions[lang].altText}
-                    onChange={(event) => updateCaption(lang, 'altText', event.target.value)}
-                    rows={3}
-                    className="mt-2"
-                  />
-                  <FieldError name={`captions.${lang}.alt_text`} errors={fields} />
-                </div>
-                <div className="mt-4">
-                  <Label htmlFor={`${lang}-caption`} className="block text-sm font-medium">
-                    {lang.toUpperCase()} caption
-                  </Label>
-                  <Textarea
-                    id={`${lang}-caption`}
-                    lang={lang}
-                    dir={lang === 'ar' ? 'rtl' : 'ltr'}
-                    value={form.captions[lang].caption}
-                    onChange={(event) => updateCaption(lang, 'caption', event.target.value)}
-                    rows={3}
-                    className="mt-2"
-                  />
-                  <FieldError name={`captions.${lang}.caption`} errors={fields} />
-                </div>
-                <Label className="mt-4 flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={form.captions[lang].approved}
-                    onChange={(event) => updateCaption(lang, 'approved', event.target.checked)}
-                    className="mt-1"
-                  />
-                  <span>{lang.toUpperCase()} description reviewed and approved</span>
-                </Label>
-                <FieldError name={`captions.${lang}.approval`} errors={fields} />
-              </Card>
-            ))}
-          </div>
-        </Card>
-        <Button
-          type="submit"
-          variant="default"
-          disabled={busy !== null || !formDirty}
-        >
-          {busy === 'save' ? 'Saving…' : 'Save changes'}
-        </Button>
-      </form>
-
-      <Card className="p-6">
-        <CardTitle className="text-xl">Preview and publication</CardTitle>
-        <CardDescription className="mt-2">
-          Save all changes before previewing or changing publication. The Go server checks consent, media, language review, and current revision.
-        </CardDescription>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={busy !== null || dirty}
-            onClick={() => void issuePreview()}
-          >
-            {busy === 'preview' ? 'Preparing preview…' : 'Generate preview link'}
-          </Button>
-          <Button
-            type="button"
-            variant={item.published ? 'destructive' : 'default'}
-            disabled={busy !== null || dirty}
-            onClick={() => void setPublished(!item.published)}
-          >
-            {busy === 'publish' ? 'Updating…' : item.published ? 'Unpublish case' : 'Publish case'}
-          </Button>
-        </div>
-        {preview && (
-          <p className="mt-4 rounded-md bg-slate-100 p-4">
-            <Button asChild variant="link" className="p-0 h-auto font-medium">
-              <a
-                href={preview.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Open private preview
-              </a>
-            </Button>
-            <span className="ml-2 text-sm text-slate-600">
-              Expires {new Date(preview.expires_at).toLocaleString('en')}
-            </span>
-          </p>
-        )}
-      </Card>
+      <GalleryEditorHeader
+        item={item} isDirty={isDirty} dirty={dirty} error={h.error} notice={h.notice} onBack={() => onNavigate('gallery')}
+      />
+      <GalleryImageCard
+        item={item} pendingFile={h.pendingFile} busy={h.busy} progress={h.progress} imageBroken={h.imageBroken}
+        beforePosition={beforePosition ?? ''}
+        onFileChange={(f) => { h.setPendingFile(f); h.setProgress(0); h.setError(''); }}
+        onUpload={() => void h.upload()} onImageError={() => h.setImageBroken(true)}
+      />
+      <GalleryEditorFormCard
+        onSubmit={handleSubmit((v) => void h.save(v), () => h.setError('Check the highlighted field.'))}
+        register={register} control={control} displayOrderError={errors.displayOrder?.message}
+        serverErrors={h.sErr} clientErrors={errors} options={options}
+        onConsentChange={(val) => setValue('consentVerified', val === (item.signed_consent_id ?? '') && Boolean(val), { shouldDirty: true })}
+        busy={h.busy} isDirty={isDirty}
+      />
+      <GalleryPublishCard
+        item={item} busy={h.busy} dirty={dirty} preview={h.preview}
+        onPreview={() => void h.issuePreview(dirty)} onSetPublished={(p) => void h.setPublished(p, dirty)}
+      />
     </div>
   );
 }

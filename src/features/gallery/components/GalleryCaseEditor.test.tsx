@@ -67,7 +67,12 @@ describe('gallery case editor', () => {
 
   it('preserves form values and shows backend validation fields after a failed save', async () => {
     setup();
-    const edit = vi.spyOn(galleryApi, 'edit').mockRejectedValue(new ApiError(400, 'VALIDATION', 'Invalid case', { 'captions.en.alt_text': 'Description required.' }));
+    const edit = vi.spyOn(galleryApi, 'edit').mockRejectedValue(
+      new ApiError(400, 'VALIDATION', 'Invalid case', {
+        'captions.en.alt_text': 'Description required.',
+        'captions.en.caption': 'Caption too long.',
+      })
+    );
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Signed consent reference'), 'signed-reference');
     await user.click(screen.getByLabelText(/I verified this reference/));
@@ -77,6 +82,8 @@ describe('gallery case editor', () => {
     await user.type(screen.getByLabelText('EN image description'), 'English description');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid case');
+    expect(screen.getByText('Description required.')).toBeInTheDocument();
+    expect(screen.getByText('Caption too long.')).toBeInTheDocument();
     expect(screen.getByLabelText('Signed consent reference')).toHaveValue('signed-reference');
     expect(screen.getByLabelText('EN image description')).toHaveValue('English description');
     expect(edit).toHaveBeenCalledWith('case-1', expect.objectContaining({
@@ -111,7 +118,8 @@ describe('gallery case editor', () => {
       });
     const user = userEvent.setup();
     const file = new File(['image bytes'], 'comparison.webp', { type: 'image/webp' });
-    await user.upload(await screen.findByLabelText('Combined image file'), file);
+    const fileInput = await screen.findByLabelText('Combined image file') as HTMLInputElement;
+    await user.upload(fileInput, file);
     await user.click(screen.getByRole('button', { name: 'Upload image' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Storage unavailable');
     expect(screen.getByText('Selected: comparison.webp')).toBeInTheDocument();
@@ -120,6 +128,7 @@ describe('gallery case editor', () => {
     expect(upload).toHaveBeenCalledTimes(2);
     expect(screen.getByText(/Revision 2 · Unpublished/)).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Combined before and after clinical image' })).toHaveAttribute('src', '/image');
+    expect(fileInput.value).toBe('');
   });
 
   it('keeps upload busy and prevents a second submission until the server responds', async () => {
@@ -195,5 +204,120 @@ describe('gallery case editor', () => {
     expect(select.value).toBe('old-retired');
     expect(screen.getByRole('option', { name: '0–3 Months' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Old Period (Retired)' })).toBeInTheDocument();
+  });
+
+  it('validates displayOrder client-side against int32 boundary without making a request', async () => {
+    setup();
+    const edit = vi.spyOn(galleryApi, 'edit');
+    const user = userEvent.setup();
+    const displayOrderInput = await screen.findByLabelText('Display order');
+    await user.clear(displayOrderInput);
+    await user.type(displayOrderInput, '2147483648');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByText('Enter a whole display order number.')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Check the highlighted field.');
+    expect(edit).not.toHaveBeenCalled();
+  });
+
+  it('shows only top-level message in error banner on 422 with inline field errors', async () => {
+    setup();
+    vi.spyOn(galleryApi, 'edit').mockRejectedValue(
+      new ApiError(422, 'VALIDATION_FAILED', 'Invalid input provided', { procedure_tag: 'Procedure required.' })
+    );
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Signed consent reference'), 'ref-1');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Invalid input provided');
+    expect(alert).not.toHaveTextContent('procedure_tag');
+    expect(await screen.findByText('Procedure required.')).toBeInTheDocument();
+  });
+
+  it('preserves dirty form edits when refetch after upload succeeds', async () => {
+    setup();
+    const refreshed = { ...emptyCase, revision: 2, media_ready: true, width: 1200, height: 800, signed_consent_id: 'original-server-ref', url: '/image', thumbnail_url: '/thumb' };
+    vi.mocked(galleryApi.get).mockResolvedValueOnce({ data: refreshed });
+    vi.spyOn(galleryApi, 'upload').mockResolvedValueOnce({ data: refreshed });
+    const user = userEvent.setup();
+    const consentInput = await screen.findByLabelText('Signed consent reference');
+    await user.type(consentInput, 'my-unsaved-edit');
+    const file = new File(['image bytes'], 'comparison.webp', { type: 'image/webp' });
+    await user.upload(screen.getByLabelText('Combined image file'), file);
+    await user.click(screen.getByRole('button', { name: 'Upload image' }));
+    expect(await screen.findByText(/Upload complete/)).toBeInTheDocument();
+    expect(consentInput).toHaveValue('my-unsaved-edit');
+  });
+
+  it('synchronizes form values with refreshed case after upload when form is clean', async () => {
+    setup();
+    const refreshed = {
+      ...emptyCase,
+      revision: 2,
+      media_ready: true,
+      width: 1200,
+      height: 800,
+      signed_consent_id: 'refreshed-server-ref',
+      url: '/image',
+      thumbnail_url: '/thumb',
+    };
+    vi.mocked(galleryApi.get).mockResolvedValueOnce({ data: refreshed });
+    vi.spyOn(galleryApi, 'upload').mockResolvedValueOnce({ data: refreshed });
+    const user = userEvent.setup();
+    const consentInput = await screen.findByLabelText('Signed consent reference');
+    expect(consentInput).toHaveValue('');
+    const file = new File(['image bytes'], 'comparison.webp', { type: 'image/webp' });
+    await user.upload(screen.getByLabelText('Combined image file'), file);
+    await user.click(screen.getByRole('button', { name: 'Upload image' }));
+    expect(await screen.findByText(/Upload complete/)).toBeInTheDocument();
+    expect(consentInput).toHaveValue('refreshed-server-ref');
+  });
+
+  it('prompts confirmation before uploading image to a published case and cancels when declined', async () => {
+    setup({ ...readyCase, published: true });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const refreshed = {
+      ...readyCase,
+      revision: 5,
+      width: 1200,
+      height: 800,
+      url: readyCase.url ?? '/admin/api/gallery/case-1/media/display',
+      thumbnail_url: readyCase.thumbnail_url ?? '/admin/api/gallery/case-1/media/thumbnail',
+    };
+    vi.mocked(galleryApi.get).mockResolvedValueOnce({ data: refreshed });
+    const upload = vi.spyOn(galleryApi, 'upload').mockResolvedValueOnce({ data: refreshed });
+    const user = userEvent.setup();
+
+    const file = new File(['image bytes'], 'replacement.webp', { type: 'image/webp' });
+    await user.upload(await screen.findByLabelText('Combined image file'), file);
+    await user.click(screen.getByRole('button', { name: 'Upload image' }));
+
+    expect(confirm).toHaveBeenCalledWith('Replacing this image will unpublish the case and reset reviews. Continue?');
+    expect(upload).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Upload image' }));
+    expect(upload).toHaveBeenCalledOnce();
+    expect(await screen.findByText(/Upload complete/)).toBeInTheDocument();
+  });
+
+  it('guards against generating preview or publishing while form has unsaved edits', async () => {
+    setup(readyCase);
+    const preview = vi.spyOn(galleryApi, 'preview');
+    const publish = vi.spyOn(galleryApi, 'publish');
+    const user = userEvent.setup();
+
+    const consentInput = await screen.findByLabelText('Signed consent reference');
+    await user.type(consentInput, '-edited');
+
+    await user.click(screen.getByRole('button', { name: 'Generate preview link' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Save changes and upload the selected image before generating a preview.'
+    );
+    expect(preview).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Publish case' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Save changes and upload the selected image before changing publication.'
+    );
+    expect(publish).not.toHaveBeenCalled();
   });
 });

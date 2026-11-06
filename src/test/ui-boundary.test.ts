@@ -53,6 +53,7 @@ const FORBIDDEN_APPEARANCE_PATTERNS = [
 
 const ALLOWED_EXCEPTIONS_BY_FILE: Record<string, string[]> = {
   'src/features/gallery/components/GalleryCaseEditor.tsx': ['file-input', 'media-canvas'],
+  'src/features/gallery/components/GalleryImageCard.tsx': ['file-input'],
   'src/features/blogs/components/BlogEditor.tsx': ['file-input', 'range-input'],
 };
 

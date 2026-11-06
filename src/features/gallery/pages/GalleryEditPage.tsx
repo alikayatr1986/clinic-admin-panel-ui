@@ -1,5 +1,5 @@
 import { GalleryCaseEditor } from '../components/GalleryCaseEditor';
-import type { GalleryEditorPageProps } from '../types/gallery.types';
+import type { GalleryEditorPageProps } from '../types/gallery.case-editor.types';
 
 export function GalleryEditPage(props: GalleryEditorPageProps) {
   return <GalleryCaseEditor {...props} />;
