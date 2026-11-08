@@ -87,3 +87,31 @@ button, input, textarea, select {
 button {
   cursor: pointer;
 }
+
+/* The application uses the leading top corner for RTL interfaces. */
+html[dir="rtl"] [data-sonner-toaster][data-x-position="right"] {
+  right: auto;
+  left: var(--offset-left);
+}
+
+@media (max-width: 600px) {
+  html[dir="rtl"] [data-sonner-toaster][data-x-position="right"] {
+    left: var(--mobile-offset-left);
+    right: var(--mobile-offset-right);
+  }
+}
+
+[data-sonner-toaster] {
+  font-family: Arial, sans-serif;
+}
+
+[data-sonner-toast][data-styled="true"] {
+  font-size: 0.875rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toaster] {
+    transition: none !important;
+  }
+}
+

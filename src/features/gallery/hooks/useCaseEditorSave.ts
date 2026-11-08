@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGalleryActions } from './useGalleryActions';
 import { galleryKeys } from './gallery.keys';
@@ -25,6 +26,7 @@ export function useCaseEditorSave({
     setNotice('');
     try {
       const r = await actions.create.mutateAsync();
+      toast.success('Case draft created.');
       onNavigate('editor', { id: r.data.id, replace: true, bypassBlock: true });
     } catch (f) {
       onFail(f);
@@ -57,6 +59,7 @@ export function useCaseEditorSave({
       );
       queryClient.setQueryData(galleryKeys.detail(item.id), { data: returned });
       reset(formFromCase(returned));
+      toast.success('Case saved.');
       setNotice(
         approvalReset
           ? 'Saved. Changed descriptions are drafts; review them and save approval again before publishing.'

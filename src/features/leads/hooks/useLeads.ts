@@ -20,3 +20,7 @@ export function useLeadStatus() {
     onSuccess: (result, { id }, generation) => { if (generation !== getLeadSessionGeneration()) return; client.setQueryData(leadsKeys.detail(id), result); void client.invalidateQueries({ queryKey: leadsKeys.lists }); void client.invalidateQueries({ queryKey: ['dashboard'] }); },
   });
 }
+
+export function useLeadExport() {
+  return useMutation({ mutationFn: () => leadsApi.export(), retry: false });
+}

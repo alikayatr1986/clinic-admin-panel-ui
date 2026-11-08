@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOutlet } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -133,7 +134,13 @@ function AdminAppContent() {
   }, []);
   async function login(username: string, password: string) {
     const operation = ++generation.current;
-    const data = await authLogin(username, password);
+    let data: AdminSession;
+    try {
+      data = await authLogin(username, password);
+    } catch (error) {
+      if (operation !== generation.current) return;
+      throw error;
+    }
     const previous = identity.current;
     if (!(await updateSession(data, operation))) return;
     void queryClient.invalidateQueries({
@@ -141,6 +148,7 @@ function AdminAppContent() {
     });
     setReauthenticating(false);
     expiryPending.current = false;
+    toast.success("Signed in successfully.");
     navigation.navigate(
       previous && previous !== `${data.username}:${data.role}`
         ? "/admin/"
@@ -154,15 +162,18 @@ function AdminAppContent() {
     try {
       await authLogout();
     } catch (error) {
+      if (operation !== generation.current) return;
       if (!(error instanceof ApiError && error.status === 401)) throw error;
     }
     if (!(await updateSession(null, operation))) return;
     returnTarget.current = "/admin/";
+    toast.success("Signed out successfully.");
     navigation.navigate("/admin/login", { replace: true, bypassBlock: true });
   }
   const handleExpired = useCallback(() => {
     if (expiryPending.current) return;
     expiryPending.current = true;
+    toast.error("Your session expired. Sign in again.");
     returnTarget.current = safeReturnTarget(
       navigation.pathname + navigation.search,
     );

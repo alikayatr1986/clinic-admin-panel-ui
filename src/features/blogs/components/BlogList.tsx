@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useAdminNavigation } from '../../../lib/admin-navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError } from '../../../lib/api';
@@ -90,10 +91,11 @@ export function BlogList({
     try {
       const key = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
       const result = await createPost.mutateAsync({ categoryID: data.categoryID, slug: data.slug, idempotencyKey: key, title: data.title });
+      toast.success('Article draft created.');
       onEdit(result.id);
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) onExpired();
-      else setCreateError(message(failure));
+      else { toast.error('Could not create the article draft. Check the form and try again.'); setCreateError(message(failure)); }
     } finally {
       setCreating(false);
     }

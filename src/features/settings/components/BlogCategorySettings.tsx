@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../../../lib/api';
 import { useBlogCategoryActionMutation, useBlogCategorySettingsQuery, useSaveBlogCategoryMutation } from '../hooks/useSettings';
@@ -49,8 +50,11 @@ export function BlogCategorySettings({ role, onExpired }: BlogCategoryPanelProps
     setError('');
     try {
       await operation();
+      toast.success('Category updated.');
       return true;
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) { onExpired?.(); return false; }
+      toast.error('Unable to update category. Please try again.');
       setError(
         err instanceof ApiError && err.status === 409
           ? 'This category conflicts with an existing key or is referenced by content.'
@@ -80,7 +84,10 @@ export function BlogCategorySettings({ role, onExpired }: BlogCategoryPanelProps
       await saveMutation.mutateAsync({ input: form, id: editing?.id });
       setOpen(false);
       setDialogError(null);
+      toast.success('Category saved.');
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) { onExpired?.(); return; }
+      toast.error('Unable to save category. Please check the details and try again.');
       setDialogError(
         err instanceof ApiError && err.status === 409
           ? 'This category conflicts with an existing key or is referenced by content.'

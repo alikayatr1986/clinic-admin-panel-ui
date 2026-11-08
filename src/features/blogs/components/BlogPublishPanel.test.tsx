@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
@@ -39,6 +40,14 @@ describe('BlogPublishPanel', () => {
     resolve({ data: { publication_id: 'new-live', aggregate_revision: 21, first_published_at: '', last_published_at: '' } });
     expect(await screen.findByText(/Publication succeeded/)).toBeInTheDocument(); await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
+  it('reports partially recorded reviews and retains recovery', async () => {
+    const value = post(); value.readiness!.ar.completed_reviews = [];
+    vi.spyOn(blogsApi, 'review').mockResolvedValueOnce({ data: { id: 'r', revision_id: 'ar-uuid', review_kind: 'editorial', created_at: '' } }).mockRejectedValueOnce(new ApiError(500, 'FAILURE', 'Failed'));
+    const errorToast = vi.spyOn(toast, 'error'); const { refresh } = mount(value);
+    fireEvent.click(screen.getByRole('button', { name: 'Record AR reviews' })); fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Confirm attestation' }));
+    await waitFor(() => expect(errorToast).toHaveBeenCalledWith(expect.stringContaining('Some reviews were recorded')));
+    expect(refresh).toHaveBeenCalled(); expect(screen.getByRole('alert')).toHaveTextContent('Some reviews were recorded');
+  });
   it('requires an explicit exact-revision attestation', async () => {
     const value = post(); value.readiness!.ar.completed_reviews = [];
     const review = vi.spyOn(blogsApi, 'review').mockResolvedValue({ data: { id: 'r', revision_id: 'ar-uuid', review_kind: 'translation', created_at: '' } }); mount(value);
@@ -50,6 +59,16 @@ describe('BlogPublishPanel', () => {
   it.each([401, 403, 409, 0])('keeps the current live state and reports lifecycle failure %s', async (status) => {
     vi.spyOn(blogsApi, 'publish').mockRejectedValue(new ApiError(status, 'FAILURE', 'Request failed.')); const { refresh } = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Publish update' })); fireEvent.click(screen.getByRole('button', { name: 'Confirm publish' })); expect(await screen.findByRole('alert')).toBeInTheDocument(); expect(refresh).not.toHaveBeenCalled(); expect(screen.queryByText(/Publication succeeded/)).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Unpublish' })).toBeInTheDocument();
+  });
+  it('handles expiry from the action and from the subsequent refresh', async () => {
+    const expired = vi.fn();
+    vi.spyOn(blogsApi, 'publish').mockRejectedValueOnce(new ApiError(401, 'UNAUTHORIZED', 'Expired')).mockResolvedValueOnce({ data: { publication_id: 'live', aggregate_revision: 21, first_published_at: '', last_published_at: '' } });
+    const refresh = vi.fn().mockRejectedValue(new ApiError(401, 'UNAUTHORIZED', 'Expired'));
+    render(<BlogPublishPanel post={post()} locked={false} lock={{ current: false }} onBusy={vi.fn()} onRefresh={refresh} onDeleted={vi.fn()} onExpired={expired} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Publish update' })); fireEvent.click(screen.getByRole('button', { name: 'Confirm publish' }));
+    await waitFor(() => expect(expired).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish update' })); fireEvent.click(screen.getByRole('button', { name: 'Confirm publish' }));
+    await waitFor(() => expect(expired).toHaveBeenCalledTimes(2));
   });
   it('confirms the exact title and public effect before withdrawal or deletion; cancel does nothing', async () => {
     const unpublish = vi.spyOn(blogsApi, 'unpublish').mockResolvedValue({ data: { id: 'p', aggregate_revision: 21, unpublished: true } }); const remove = vi.spyOn(blogsApi, 'delete').mockResolvedValue({ data: { id: 'p', deleted: true } }); const { deleted } = mount();
@@ -75,9 +94,10 @@ describe('BlogPublishPanel', () => {
     expect(screen.getByText('Arabic body is missing.')).toBeInTheDocument();
   });
   it('cancelling the publish summary publishes nothing and returns focus; Manage holds the rare actions', async () => {
+    const successToast = vi.spyOn(toast, 'success'); const errorToast = vi.spyOn(toast, 'error');
     const publish = vi.spyOn(blogsApi, 'publish'); mount();
     const trigger = screen.getByRole('button', { name: 'Publish update' }); fireEvent.click(trigger); fireEvent.click(screen.getByRole('button', { name: 'Cancel publish' }));
-    expect(publish).not.toHaveBeenCalled(); expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); await waitFor(() => expect(trigger).toHaveFocus());
+    expect(publish).not.toHaveBeenCalled(); expect(successToast).not.toHaveBeenCalled(); expect(errorToast).not.toHaveBeenCalled(); expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); await waitFor(() => expect(trigger).toHaveFocus());
     const manage = screen.getByText('Manage').closest('details')!; expect(manage).not.toHaveAttribute('open');
     for (const name of ['Unpublish', 'Delete article', 'Feature this article']) expect(manage).toContainElement(screen.getByRole('button', { name }));
     expect(manage).not.toContainElement(trigger);

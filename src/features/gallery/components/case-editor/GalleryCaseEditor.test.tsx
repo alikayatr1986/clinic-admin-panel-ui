@@ -131,6 +131,19 @@ describe('gallery case editor', () => {
     expect(fileInput.value).toBe('');
   });
 
+  it('reports a failed refresh after a successful upload and retains edits', async () => {
+    setup();
+    await screen.findByLabelText('Signed consent reference');
+    vi.mocked(galleryApi.get).mockRejectedValueOnce(new ApiError(500, 'FAILURE', 'Refresh failed'));
+    vi.spyOn(galleryApi, 'upload').mockResolvedValueOnce({ data: { ...emptyCase, revision: 2, width: 1200, height: 800, url: '/image', thumbnail_url: '/thumb' } });
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText('Signed consent reference'), 'unsaved');
+    await user.upload(screen.getByLabelText('Combined image file'), new File(['image'], 'image.webp', { type: 'image/webp' }));
+    await user.click(screen.getByRole('button', { name: 'Upload image' }));
+    expect(await screen.findByText(/Image uploaded, but the case could not be refreshed/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Signed consent reference')).toHaveValue('unsaved');
+  });
+
   it('keeps upload busy and prevents a second submission until the server responds', async () => {
     setup();
     let finishUpload!: (value: { data: GalleryUploadResult }) => void;

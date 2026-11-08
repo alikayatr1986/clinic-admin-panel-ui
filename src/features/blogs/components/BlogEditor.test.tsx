@@ -2,6 +2,7 @@ import { BlogDraftProvider } from '../context/BlogDraftContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../lib/api';
 import { blogsApi } from '../services/blogs.service';
@@ -30,6 +31,74 @@ function reviewedPost(): BlogDetail {
 }
 
 describe('BlogEditor', () => {
+  it('navigates steps while retaining unsaved work and focusing the stage', async () => {
+    vi.spyOn(blogsApi, 'get').mockResolvedValue({ data: detail });
+    vi.spyOn(blogsApi, 'options').mockResolvedValue({ data: options });
+    const save = vi.spyOn(blogsApi, 'save');
+    render(<BlogEditor postID="post-1" onExpired={vi.fn()} onNavigate={vi.fn()} registerBlocker={vi.fn()} />);
+    const title = await screen.findByLabelText('Title');
+    expect(screen.getByRole('button', { name: /2\. Details · Current/ })).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByRole('button', { name: /1\. Start · Draft created/ })).toBeDisabled();
+    fireEvent.change(title, { target: { value: 'Unsaved title' } });
+    const user = userEvent.setup();
+    screen.getByRole('button', { name: 'Next' }).focus();
+    await user.keyboard('{Enter}');
+    const heading = screen.getByRole('heading', { name: 'Step 3 of 5: Content' });
+    await waitFor(() => expect(heading).toHaveFocus());
+    fireEvent.click(screen.getByRole('button', { name: /4\. Cover/ }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Step 4 of 5: Cover' })).toHaveFocus());
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(title).toHaveValue('Unsaved title');
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    expect(save).not.toHaveBeenCalled();
+    expect(window.confirm).not.toHaveBeenCalled();
+  });
+
+  it('shows local progress and retains both languages across stages', async () => {
+    vi.spyOn(blogsApi, 'get').mockResolvedValue({ data: detail });
+    vi.spyOn(blogsApi, 'options').mockResolvedValue({ data: options });
+    render(<BlogEditor postID="post-1" onExpired={vi.fn()} onNavigate={vi.fn()} registerBlocker={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'English draft' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'العربية' }));
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'مسودة' } });
+    fireEvent.click(screen.getByRole('button', { name: /3\. Content/ }));
+    expect(screen.getByText('Content · Incomplete')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add reference' }));
+    expect(screen.getByText(/Needs attention: a reference is incomplete/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /2\. Details/ }));
+    expect(screen.getByLabelText('Title')).toHaveValue('مسودة');
+    fireEvent.click(screen.getByRole('tab', { name: 'English' }));
+    expect(screen.getByLabelText('Title')).toHaveValue('English draft');
+  });
+
+  it('retains separate cover selections and AI briefs across language and stage changes', async () => {
+    vi.spyOn(blogsApi, 'get').mockResolvedValue({ data: detail });
+    vi.spyOn(blogsApi, 'options').mockResolvedValue({ data: { ...options, generation_enabled: true } });
+    render(<BlogEditor postID="post-1" onExpired={vi.fn()} onNavigate={vi.fn()} registerBlocker={vi.fn()} />);
+    await screen.findByLabelText('Title');
+    fireEvent.click(screen.getByRole('button', { name: /3\. Content/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Topic *' }), { target: { value: 'English brief' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'العربية' }));
+    expect(screen.getByRole('textbox', { name: 'Topic *' })).toHaveValue('');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Topic *' }), { target: { value: 'Arabic brief' } });
+    fireEvent.click(screen.getByRole('button', { name: /4\. Cover/ }));
+    fireEvent.change(screen.getByLabelText('Image'), { target: { files: [new File(['ar'], 'arabic.png', { type: 'image/png' })] } });
+    fireEvent.change(screen.getByLabelText('Rights/source record'), { target: { value: 'Arabic rights' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'English' }));
+    fireEvent.change(screen.getByLabelText('Image'), { target: { files: [new File(['en'], 'english.png', { type: 'image/png' })] } });
+    fireEvent.change(screen.getByLabelText('Rights/source record'), { target: { value: 'English rights' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'العربية' }));
+    expect(screen.getByText('Selected: arabic.png')).toBeInTheDocument();
+    expect(screen.getByLabelText('Rights/source record')).toHaveValue('Arabic rights');
+    fireEvent.click(screen.getByRole('button', { name: /3\. Content/ }));
+    expect(screen.getByRole('textbox', { name: 'Topic *' })).toHaveValue('Arabic brief');
+    fireEvent.click(screen.getByRole('tab', { name: 'English' }));
+    expect(screen.getByRole('textbox', { name: 'Topic *' })).toHaveValue('English brief');
+    fireEvent.click(screen.getByRole('button', { name: /4\. Cover/ }));
+    expect(screen.getByText('Selected: english.png')).toBeInTheDocument();
+    expect(screen.getByLabelText('Rights/source record')).toHaveValue('English rights');
+  });
+
   it('retains the localized label of its retired category', async () => {
     vi.spyOn(blogsApi, 'get').mockResolvedValue({ data: { ...detail, category_name_en: 'ENT Health', category_name_ar: 'صحة' } });
     vi.spyOn(blogsApi, 'options').mockResolvedValue({ data: { ...options, categories: [] } });
@@ -168,6 +237,7 @@ describe('BlogEditor', () => {
     let resolve!: (value: { data: { media_id: string; aggregate_revision: number; width: number; height: number; focal_x: number; focal_y: number } }) => void;
     const upload = vi.spyOn(blogsApi, 'upload').mockReturnValue(new Promise((done) => { resolve = done; })); const save = vi.spyOn(blogsApi, 'save').mockResolvedValue({ data: { id: 'post-1', aggregate_revision: 8, edition_revision: 1, updated_at: '2026-01-02T00:00:00Z' } });
     render(<BlogEditor postID="post-1" onExpired={vi.fn()} onNavigate={vi.fn()} registerBlocker={vi.fn()} />); const title = await screen.findByLabelText('Title'); fireEvent.change(title, { target: { value: 'Unsaved while uploading' } });
+    fireEvent.click(screen.getByRole('button', { name: /4\. Cover/ }));
     const image = new File(['bytes'], 'cover.png', { type: 'image/png' }); fireEvent.change(screen.getByLabelText('Image'), { target: { files: [image] } }); fireEvent.change(screen.getByLabelText('Rights/source record'), { target: { value: 'Licensed stock record' } }); const button = screen.getByRole('button', { name: 'Upload cover' }); fireEvent.click(button); fireEvent.click(button); await waitFor(() => expect(upload).toHaveBeenCalledOnce());
     resolve({ data: { media_id: 'media-1', aggregate_revision: 7, width: 1600, height: 1200, focal_x: .5, focal_y: .5 } }); expect(await screen.findByText(/Cover uploaded/)).toBeInTheDocument(); expect(title).toHaveValue('Unsaved while uploading'); expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save' })); await waitFor(() => expect(save).toHaveBeenCalledWith('post-1', expect.objectContaining({ expected_revision: 7, cover_media_id: 'media-1', title: 'Unsaved while uploading' })));
@@ -180,9 +250,11 @@ describe('BlogEditor', () => {
     fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'Full title' } });
     fireEvent.change(screen.getByLabelText('Excerpt'), { target: { value: 'Full excerpt' } });
     fireEvent.change(screen.getByLabelText('Public author'), { target: { value: 'Dr. Clinic' } });
+    fireEvent.click(screen.getByRole('button', { name: /4\. Cover/ }));
     fireEvent.change(screen.getByLabelText('Cover alt text'), { target: { value: 'Cover description' } });
-    fireEvent.change(screen.getByLabelText('SEO title'), { target: { value: 'SEO title' } });
-    fireEvent.change(screen.getByLabelText('SEO description'), { target: { value: 'SEO description' } });
+    fireEvent.click(screen.getByRole('button', { name: /3\. Content/ }));
+    fireEvent.change(screen.getByLabelText('SEO title (optional)'), { target: { value: 'SEO title' } });
+    fireEvent.change(screen.getByLabelText('SEO description (optional)'), { target: { value: 'SEO description' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add paragraph' }));
     fireEvent.change(screen.getByLabelText('Block text 1'), { target: { value: 'Body copy' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add text mark' }));
@@ -208,8 +280,12 @@ describe('BlogEditor single save', () => {
     fireEvent.change(await screen.findByLabelText('Title'), { target: { value: 'EN edit' } });
     fireEvent.click(screen.getByRole('tab', { name: 'العربية' })); fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'AR edit' } });
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /3\. Content/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(await screen.findByText(/Arabic was not saved \(English saved\)/)).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'العربية', selected: true })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveFocus());
+    expect(screen.getByLabelText('Title')).toHaveAttribute('aria-invalid', 'true');
     expect(save).toHaveBeenCalledTimes(2);
     expect(save.mock.calls[0][1]).toMatchObject({ lang: 'en', expected_revision: post.aggregate_revision });
     expect(save.mock.calls[1][1]).toMatchObject({ lang: 'ar', expected_revision: post.aggregate_revision + 1 });
@@ -234,7 +310,7 @@ describe('BlogEditor attestation void warning', () => {
     render(<BlogEditor postID="post-1" onExpired={vi.fn()} onNavigate={vi.fn()} registerBlocker={vi.fn()} />);
     fireEvent.click(await screen.findByRole('tab', { name: 'العربية' })); fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'AR edit' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Saving voids: editorial, medical, media rights, translation (Arabic). You will need to attest again.'));
+    await waitFor(() => expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Saving voids: editorial, medical, media rights, translation (Arabic). You will need to attest again.')));
     expect(save).not.toHaveBeenCalled(); expect(screen.getByLabelText('Title')).toHaveValue('AR edit');
   });
 });

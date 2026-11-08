@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -6,7 +7,7 @@ import { useSaveVerificationMutation, useVerificationSettingsQuery } from '../ho
 vi.mock('../hooks/useVerificationSettings', () => ({ useSaveVerificationMutation: vi.fn(), useVerificationSettingsQuery: vi.fn() }));
 const setting = { method: 'email', enabled: false, provider: 'twilio', expiry_minutes: 10, resend_cooldown_seconds: 60, max_sends: 3, max_checks: 5, lockout_minutes: 15, retention_days: 30, fallback_to_sms: false, account_sid: '', service_sid: '', sender: '', template_id: '', secret_configured: true, adapter_available: false, generation: 0 };
 const save = vi.fn();
-beforeEach(() => { vi.clearAllMocks(); vi.mocked(useSaveVerificationMutation).mockReturnValue({ mutateAsync: save, isPending: false, reset: vi.fn() } as never); vi.mocked(useVerificationSettingsQuery).mockReturnValue({ data: { data: [setting] }, isLoading: false, isError: false } as never); });
+beforeEach(() => { vi.clearAllMocks(); vi.spyOn(toast, 'error'); vi.spyOn(toast, 'success'); vi.mocked(useSaveVerificationMutation).mockReturnValue({ mutateAsync: save, isPending: false, reset: vi.fn() } as never); vi.mocked(useVerificationSettingsQuery).mockReturnValue({ data: { data: [setting] }, isLoading: false, isError: false } as never); });
 afterEach(cleanup);
 describe('verification settings', () => {
   it('does not request protected settings for staff', () => { render(<VerificationSettings role="staff" />); expect(screen.getByText(/Only administrators/)).toBeInTheDocument(); expect(useVerificationSettingsQuery).not.toHaveBeenCalled(); });
@@ -20,7 +21,17 @@ describe('verification settings', () => {
     await user.click(within(form).getByRole('button', { name: 'Save Email' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('draft has been preserved');
     expect(within(form).getByLabelText('Twilio account SID')).toHaveValue('AC-test');
+    expect(toast.error).toHaveBeenCalledWith('Unable to save verification settings. Your draft has been preserved.');
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ method: 'email', input: expect.objectContaining({ secret: '', account_sid: 'AC-test' }) }));
+  });
+  it('confirms a successful save without including provider credentials', async () => {
+    const user = userEvent.setup(); save.mockResolvedValue({ data: setting });
+    render(<VerificationSettings role="admin" />);
+    await user.type(screen.getByLabelText('Twilio account SID'), 'AC-private');
+    await user.click(screen.getByRole('button', { name: 'Save Email' }));
+    await screen.findByText('Settings saved.');
+    expect(toast.success).toHaveBeenCalledOnce();
+    expect(toast.success).toHaveBeenCalledWith('Verification settings saved.');
   });
   it('shows bounds validation beside the field without saving', async () => {
     const user = userEvent.setup(); render(<VerificationSettings role="admin" />);
@@ -42,6 +53,7 @@ it('disables fields during a save and expires the session on 401', async () => {
   rejectSave(new ApiError(401, 'UNAUTHORIZED', 'Session expired'));
   expect(await screen.findByRole('alert')).toHaveTextContent('Session expired');
   expect(onExpired).toHaveBeenCalledOnce();
+  expect(toast.error).not.toHaveBeenCalled();
 });
 
 it('updates pristine forms and protects dirty drafts when server data changes', async () => {

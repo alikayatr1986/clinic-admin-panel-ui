@@ -1,8 +1,10 @@
+import { toast } from 'sonner';
 import { useRef, useState } from 'react';
 import { ApiError, describeError } from '../../../lib/api';
 import { useBlogOptions } from '../hooks/useBlogOptions';
 import { useCreateBlogPost } from '../hooks/useBlogMutations';
 import { BlogCreateForm } from '../components/BlogCreateForm';
+import { BlogGuidedNavigation } from '../components/guided-editor/BlogGuidedNavigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import type { BlogCreateData, BlogCreatePageProps } from '../types/blogs.types';
@@ -29,11 +31,13 @@ export function BlogCreatePage({ onExpired, onCreated, onCancel }: BlogCreatePag
         idempotencyKey: idempotencyKeyRef.current,
         title: data.title,
       });
+      toast.success('Article draft created.');
       onCreated(result.id);
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) {
         onExpired();
       } else {
+        toast.error('Could not create the article draft. Check the form and try again.');
         setCreateError(describeError(failure));
       }
     } finally {
@@ -60,7 +64,9 @@ export function BlogCreatePage({ onExpired, onCreated, onCancel }: BlogCreatePag
         aria-label="Create article draft"
         className="p-6"
       >
-        <h2 className="text-xl font-semibold">New article draft</h2>
+        <BlogGuidedNavigation current="Start" />
+        <h2 className="mt-4 text-xl font-semibold">New article draft</h2>
+        <p className="text-sm text-slate-600">Step 1 of 5: Start</p>
         <p className="mt-1 text-sm text-slate-600">
           Set the category and initial title. Bilingual body editing and AI assistance begin once the draft is created.
         </p>

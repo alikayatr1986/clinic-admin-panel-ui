@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useEffect, useState } from "react";
 import { useAdminNavigation } from "../../../lib/admin-navigation";
 import { ApiError } from "../../../lib/api";
@@ -18,8 +19,8 @@ export function GalleryDetailPage({ caseID, onExpired, onEdit, onBack }: Gallery
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (query.error instanceof ApiError && query.error.status === 401) onExpired();
-  }, [query.error, onExpired]);
+    if (!query.data && query.error instanceof ApiError && query.error.status === 401) onExpired();
+  }, [query.data, query.error, onExpired]);
 
   const perform = async (action: () => Promise<unknown>, done?: () => void) => {
     setError("");
@@ -28,7 +29,7 @@ export function GalleryDetailPage({ caseID, onExpired, onEdit, onBack }: Gallery
       done?.();
     } catch (failure) {
       if (failure instanceof ApiError && failure.status === 401) onExpired();
-      else setError(failure instanceof Error ? failure.message : "Request failed.");
+      else { toast.error(failure instanceof Error && failure.message.startsWith("Consent was withdrawn") ? failure.message : "The case action failed. Try again."); setError(failure instanceof Error ? failure.message : "Request failed."); }
     }
   };
 
@@ -87,7 +88,7 @@ export function GalleryDetailPage({ caseID, onExpired, onEdit, onBack }: Gallery
         onBack={onBack}
         onEdit={onEdit}
         perform={perform}
-        onRefetch={() => query.refetch()}
+        onRefetch={() => query.refetch({ throwOnError: true })}
       />
     </Card>
   );

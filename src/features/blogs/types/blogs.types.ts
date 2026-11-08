@@ -142,6 +142,13 @@ export interface BlogDraftFormState {
   references: BlogReference[];
 }
 
+export interface BlogCoverDraft {
+  file: File | null;
+  rights: string;
+  focalX: number;
+  focalY: number;
+}
+
 export interface BlogDraftRecord {
   forms: Record<BlogLocale, BlogDraftFormState>;
   saved: Record<BlogLocale, BlogDraftFormState>;
@@ -150,6 +157,7 @@ export interface BlogDraftRecord {
   rights: string;
   focalX: number;
   focalY: number;
+  covers?: Record<BlogLocale, BlogCoverDraft>;
   dirty: boolean;
 }
 
@@ -185,14 +193,18 @@ export interface BlogPreviewPageProps {
 export interface BlogGeneratorProps {
   postID: string;
   locale: BlogLocale;
+  active?: boolean;
   baseRevision: number;
   dirty: boolean;
   currentDraft: { title: string; excerpt: string; seoTitle: string; seoDescription: string };
   onRefresh: (expectedRevision?: number) => Promise<void>;
   onApplied?: (notice: string) => void;
+  onExpired?: () => void;
 }
 
 export interface BlogGenerationReviewProps {
+  selected: Record<string, boolean>;
+  onSelectedChange: (value: Record<string, boolean>) => void;
   job: BlogGenerationJob;
   currentDraft: { title: string; excerpt: string; seoTitle: string; seoDescription: string };
   locale: BlogLocale;
@@ -215,7 +227,15 @@ export interface BlogBodyProps { body: BlogBody }
 export interface BlogPreviewProps { postID: string; locale: BlogLocale; revision?: number; dirty: boolean; onClose: () => void }
 export interface BlogEditorProps { postID: string; role?: 'admin' | 'staff'; onExpired: () => void; onNavigate: () => void; onDeleted?: () => void; registerBlocker: (blocker: (() => boolean) | null) => void }
 export interface BlogRequiredProps { children: string }
-export interface BlogPublishPanelProps { post: BlogDetail; onJump?: (locale: BlogLocale, field: string) => void; locked: boolean; lock: MutableRefObject<boolean>; onBusy: (busy: boolean) => void; onRefresh: () => Promise<void>; onDeleted: () => void }
+export interface BlogPublishPanelProps { post: BlogDetail; onJump?: (locale: BlogLocale, field: string) => void; locked: boolean; lock: MutableRefObject<boolean>; onBusy: (busy: boolean) => void; onRefresh: () => Promise<void>; onDeleted: () => void; onExpired?: () => void }
 export interface BlogReviewSelection { locale: BlogLocale; revisionID: string; categoryID: string }
 
 export interface BlogGenerationSelection { scope: string; id: string }
+
+export type BlogGuidedStep = 'Start' | 'Details' | 'Content' | 'Cover' | 'Review and publish';
+export interface BlogGuidedNavigationProps {
+  current: BlogGuidedStep;
+  onSelect?: (step: BlogGuidedStep) => void;
+}
+
+export type BlogEditorFormValues = { forms: Record<BlogLocale, BlogDraftFormState> | null };

@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { useRef, useState } from 'react';
 import type { AdminShellProps } from '../../types/layout.types';
 import { getNavItems } from './navigation';
 import { AdminSidebar } from './AdminSidebar';
-import { describeError } from '../../lib/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -16,14 +16,9 @@ export function AdminShell({
 }: AdminShellProps) {
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [logoutError, setLogoutError] = useState('');
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const navItems = getNavItems(session.role);
-
-  useEffect(() => {
-    setLogoutError('');
-  }, [path, routeId]);
 
   const pageTitle =
     routeId === 'settings'
@@ -58,11 +53,10 @@ export function AdminShell({
 
   async function submitLogout() {
     setLoggingOut(true);
-    setLogoutError('');
     try {
       await onLogout();
-    } catch (error) {
-      setLogoutError(describeError(error));
+    } catch {
+      toast.error('Unable to sign out. Please try again.');
     } finally {
       setLoggingOut(false);
     }
@@ -138,12 +132,6 @@ export function AdminShell({
             Staff workspace
           </p>
           <h1 className="mt-2 text-3xl font-semibold">{pageTitle}</h1>
-
-          {logoutError && (
-            <p role="alert" className="mt-5 rounded-md bg-red-50 p-4 text-red-800">
-              {logoutError}
-            </p>
-          )}
 
           {children}
         </main>

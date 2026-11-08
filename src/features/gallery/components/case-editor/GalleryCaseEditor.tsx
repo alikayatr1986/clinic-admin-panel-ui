@@ -32,7 +32,7 @@ export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlock
     reset,
     onExpired,
     onNavigate,
-    refetchCase: async () => (await cq.refetch()).data?.data ?? null,
+    refetchCase: async () => (await cq.refetch({ throwOnError: true })).data?.data ?? null,
   });
 
   const beforePosition = useWatch({ control, name: 'beforePosition' });
@@ -45,7 +45,7 @@ export function GalleryCaseEditor({ caseID, onExpired, onNavigate, registerBlock
     }
   }, [item, reset]);
 
-  const queryError = oq.error || (caseID !== 'new' ? cq.error : null);
+  const queryError = (!options && oq.error) || (caseID !== 'new' && !item ? cq.error : null);
   useEffect(() => {
     if (queryError instanceof ApiError && queryError.status === 401) onExpired();
   }, [queryError, onExpired]);

@@ -24,10 +24,10 @@ export function csrfToken(): string | null {
   }
 }
 
-export async function adminRequest<T>(path: `/admin/api/${string}`, init: RequestInit = {}): Promise<T> {
+async function adminFetch(path: `/admin/api/${string}`, init: RequestInit = {}): Promise<Response> {
   const method = (init.method ?? 'GET').toUpperCase();
   const headers = new Headers(init.headers);
-  headers.set('Accept', 'application/json');
+  if (!headers.has('Accept')) headers.set('Accept', 'application/json');
   if (init.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
@@ -44,17 +44,25 @@ export async function adminRequest<T>(path: `/admin/api/${string}`, init: Reques
     throw new ApiError(0, 'NETWORK_ERROR', 'Cannot reach the clinic server. Try again.');
   }
 
+  if (response.ok) return response;
   let body: unknown;
   try {
     body = await response.json();
   } catch {
     throw new ApiError(response.status, 'INVALID_RESPONSE', 'The server sent an unexpected response.');
   }
-  if (!response.ok) {
-    const error = (body as ErrorEnvelope)?.error;
-    throw new ApiError(response.status, error?.code ?? 'REQUEST_FAILED', error?.message ?? 'Request failed.', error?.fields);
-  }
-  return body as T;
+  const error = (body as ErrorEnvelope)?.error;
+  throw new ApiError(response.status, error?.code ?? 'REQUEST_FAILED', error?.message ?? 'Request failed.', error?.fields);
+}
+
+export async function adminRequest<T>(path: `/admin/api/${string}`, init: RequestInit = {}): Promise<T> {
+  const response = await adminFetch(path, init);
+  try { return await response.json() as T; }
+  catch { throw new ApiError(response.status, 'INVALID_RESPONSE', 'The server sent an unexpected response.'); }
+}
+
+export async function adminBinaryRequest(path: `/admin/api/${string}`, init: RequestInit = {}): Promise<Response> {
+  return adminFetch(path, init);
 }
 
 // Fetch does not expose upload progress, so media writes use the same cookie/CSRF

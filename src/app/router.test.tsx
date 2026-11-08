@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createBrowserRouter, createMemoryRouter, RouterProvider } from 'react-router-dom';
@@ -89,6 +90,7 @@ describe('admin data router', () => {
   });
 
   it('preserves a dirty draft on cancelled sign-out and signs out once after confirmation', async () => {
+    const successToast = vi.spyOn(toast, 'success');
     window.history.replaceState({}, '', '/admin/blogs/post-1/edit');
     vi.spyOn(authApi, 'session').mockResolvedValue({ data: { username: 'staff', role: 'staff', expires_at: '2030-01-01' } });
     const logout = vi.spyOn(authApi, 'logout').mockResolvedValue({ data: { success: true } } as never);
@@ -100,10 +102,12 @@ describe('admin data router', () => {
     const title = await screen.findByLabelText('Title'); await user.clear(title); await user.type(title, 'Private draft');
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(confirm).toHaveBeenCalledTimes(1); expect(logout).not.toHaveBeenCalled();
+    expect(successToast).not.toHaveBeenCalled();
     expect(window.location.pathname).toBe('/admin/blogs/post-1/edit'); expect(title).toHaveValue('Private draft');
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(await screen.findByRole('heading', { name: 'Staff sign in' })).toBeInTheDocument();
     expect(confirm).toHaveBeenCalledTimes(2); expect(logout).toHaveBeenCalledOnce();
+    expect(successToast).toHaveBeenCalledExactlyOnceWith('Signed out successfully.');
     expect(window.location.pathname).toBe('/admin/login');
     router.dispose();
   });

@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -58,12 +59,14 @@ export function useGalleryContentForm({
       if (!item) throw new Error('The server did not return the saved content.');
       form.reset({ eyebrow: item.eyebrow, heading: item.heading, introduction: item.introduction, statistics: item.statistics ?? [] });
       setRevision(item.revision); setStatus(item.approval); onClearRecovery();
+      toast.success(approval === 'approved' ? 'Gallery content approved.' : 'Gallery content saved.');
       setNoticeMessage(`Server saved revision ${item.revision} with status ${item.approval}.`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         if (onSave401()) onExpired();
         else setErrorMessage('Your session expired and your edits could not be stored. Copy them before signing in again.');
       } else {
+        toast.error('Could not save gallery content. Check the details and try again.');
         const is409 = err instanceof ApiError && err.status === 409;
         setConflict(is409); setServerErrors(fieldErrors(err));
         setErrorMessage(is409 ? 'This content changed elsewhere. Your edits are still here; copy them before leaving.' : err instanceof Error ? err.message : 'Save failed. Try again.');

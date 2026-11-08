@@ -158,10 +158,7 @@ export function LeadListRoute() {
   return c.session.role !== "admin" ? (
     <p role="alert">Access denied. Administrator access is required.</p>
   ) : (
-    <LeadList
-      onExpired={c.onExpired}
-      onOpen={(id) => c.navigate(`/admin/leads/${encodeURIComponent(id)}`)}
-    />
+    <LeadList onExpired={c.onExpired} />
   );
 }
 export function LeadDetailRoute() {

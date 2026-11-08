@@ -10,6 +10,6 @@ export interface Lead {
 }
 export interface LeadFilters { page: number; page_size: number; status: string; preferred_contact: string; procedure: string }
 export interface LeadListResponse { data: Lead[]; meta: { page: number; page_size: number; total: number } }
-export interface LeadListProps { onExpired: () => void; onOpen: (id: string) => void }
-export interface LeadDetailProps { id: string; onExpired: () => void; onBack: () => void }
+export interface LeadListProps { onExpired: () => void }
+export interface LeadDetailProps { id: string; onExpired: () => void; onBack?: () => void; onDirtyChange?: (dirty: boolean) => void; onBusyChange?: (busy: boolean) => void }
 export interface LeadStatusUpdate { id: string; status: LeadStatus; revision: number }

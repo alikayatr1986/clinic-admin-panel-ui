@@ -2,9 +2,13 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LoginPage } from './LoginPage';
+import { toast } from 'sonner';
 import { ApiError } from '../../../lib/api';
 
+vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
+
 afterEach(() => {
+  vi.clearAllMocks();
   cleanup();
   vi.restoreAllMocks();
 });
@@ -79,9 +83,8 @@ describe('LoginPage component', () => {
     await user.type(screen.getByLabelText('Password'), 'wrong-pass');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Invalid username or password.');
-    expect(alert).toHaveClass('border-destructive/20', 'bg-destructive/10', 'text-destructive');
+    expect(toast.error).toHaveBeenCalledOnce();
+    expect(toast.error).toHaveBeenCalledWith('Invalid username or password.');
     expect(screen.getByRole('button', { name: 'Sign in' })).not.toBeDisabled();
     expect(screen.getByLabelText('Password')).toHaveValue('');
   });
@@ -111,8 +114,7 @@ describe('LoginPage component', () => {
     await user.type(screen.getByLabelText('Password'), 'secret');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent('Server maintenance in progress');
+    expect(toast.error).toHaveBeenCalledWith('Unable to sign in. Please try again.');
     expect(screen.getByRole('button', { name: 'Sign in' })).not.toBeDisabled();
   });
 });

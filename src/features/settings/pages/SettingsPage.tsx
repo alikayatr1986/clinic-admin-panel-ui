@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../../../lib/api';
 import { Button } from '@/components/ui/button';
@@ -58,8 +59,8 @@ export function SettingsPage({ role = 'admin', onExpired }: SettingsPageProps) {
   const procedures = procedureQuery.data?.data ?? [];
   const runProcedure = async (operation: () => Promise<unknown>) => {
     setPageError(null);
-    try { await operation(); return true; }
-    catch (err) { setPageError(err instanceof ApiError ? err.message : 'Failed to update procedure.'); return false; }
+    try { await operation(); toast.success('Procedure updated.'); return true; }
+    catch (err) { if (err instanceof ApiError && err.status === 401) { onExpired?.(); return false; } toast.error('Unable to update procedure. Please try again.'); setPageError(err instanceof ApiError ? err.message : 'Failed to update procedure.'); return false; }
   };
   const submitProcedure = async (input: ProcedureFormData) => {
     const ok = await runProcedure(() => editingProcedure
@@ -125,7 +126,10 @@ export function SettingsPage({ role = 'admin', onExpired }: SettingsPageProps) {
         await createMutation.mutateAsync(createPayload);
       }
       setFormDialogOpen(false);
+      toast.success('Timeframe saved.');
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) { onExpired?.(); return; }
+      toast.error('Unable to save timeframe. Please check the details and try again.');
       if (err instanceof ApiError) {
         if (err.fields?.detail === 'cannot_modify_referenced_range') {
           setDialogError('Cannot modify range for a timeframe referenced by gallery cases.');
@@ -151,7 +155,10 @@ export function SettingsPage({ role = 'admin', onExpired }: SettingsPageProps) {
         input: { approval_attestation: attestation },
       });
       setActivationDialogOpen(false);
+      toast.success('Timeframe activated.');
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) { onExpired?.(); return; }
+      toast.error('Unable to activate timeframe. Please try again.');
       if (err instanceof ApiError) {
         if (err.fields?.detail === 'overlapping_active_range') {
           setDialogError('Cannot activate: this timeframe range overlaps with an existing active timeframe.');
@@ -171,7 +178,10 @@ export function SettingsPage({ role = 'admin', onExpired }: SettingsPageProps) {
     setPageError(null);
     try {
       await retireMutation.mutateAsync(tf.id);
+      toast.success('Timeframe retired.');
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) { onExpired?.(); return; }
+      toast.error('Unable to retire timeframe. Please try again.');
       setPageError(err instanceof ApiError ? err.message : 'Failed to retire timeframe.');
     }
   };
@@ -183,7 +193,10 @@ export function SettingsPage({ role = 'admin', onExpired }: SettingsPageProps) {
     setPageError(null);
     try {
       await deleteMutation.mutateAsync(tf.id);
+      toast.success('Timeframe deleted.');
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) { onExpired?.(); return; }
+      toast.error('Unable to delete timeframe. Please try again.');
       setPageError(err instanceof ApiError ? err.message : 'Failed to delete timeframe.');
     }
   };
@@ -200,7 +213,10 @@ export function SettingsPage({ role = 'admin', onExpired }: SettingsPageProps) {
     const orderedIds = reordered.map((t: TimeframeSetting) => t.id);
     try {
       await reorderMutation.mutateAsync(orderedIds);
+      toast.success('Timeframes reordered.');
     } catch (err: unknown) {
+      if (err instanceof ApiError && err.status === 401) { onExpired?.(); return; }
+      toast.error('Unable to reorder timeframe. Please try again.');
       setPageError(err instanceof ApiError ? err.message : 'Failed to reorder timeframes.');
     }
   };

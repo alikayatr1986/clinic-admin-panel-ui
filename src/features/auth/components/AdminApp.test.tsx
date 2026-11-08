@@ -1,8 +1,9 @@
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { toast } from 'sonner';
+import { createBrowserRouter, RouterProvider, useOutletContext } from 'react-router-dom';
 import { NavigationBoundary } from '../../../app/navigation';
 import { adminRouteContracts } from '../../../app/route-contract';
 import type { ReactElement } from 'react';
-import { cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../../lib/api';
@@ -13,6 +14,12 @@ import { galleryApi } from '../../gallery/services/gallery.service';
 import { blogsApi } from '../../blogs/services/blogs.service';
 import { AdminApp } from '../../../app/AdminApp';
 import { leadsApi } from '../../leads/services/leads.service';
+
+
+function RepeatedExpiry() {
+  const { onExpired } = useOutletContext<{ onExpired: () => void }>();
+  return <button onClick={() => { onExpired(); onExpired(); }}>Expire twice</button>;
+}
 
 function render(_element: ReactElement) { const router = createBrowserRouter([{ element: <NavigationBoundary />, children: [{ element: <AdminApp />, children: adminRouteContracts }] }], { basename: '/admin' }); return rtlRender(<RouterProvider router={router} />); }
 afterEach(() => {
@@ -27,6 +34,30 @@ function json(data: unknown, status = 200) {
 }
 
 describe('admin authentication shell', () => {
+  it('emits one expiry toast when the same expiry is reported repeatedly', async () => {
+    window.history.replaceState({}, '', '/admin/');
+    vi.spyOn(authApi, 'session').mockResolvedValue({ data: { username: 'staff', role: 'staff', expires_at: '2030-01-01' } });
+    const errorToast = vi.spyOn(toast, 'error');
+    const router = createBrowserRouter([{ element: <NavigationBoundary />, children: [{ element: <AdminApp />, children: [{ index: true, element: <RepeatedExpiry /> }, { path: 'login' }] }] }], { basename: '/admin' });
+    rtlRender(<RouterProvider router={router} />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Expire twice' }));
+    expect(await screen.findByRole('heading', { name: 'Staff sign in' })).toBeVisible();
+    expect(errorToast).toHaveBeenCalledExactlyOnceWith('Your session expired. Sign in again.');
+    router.dispose();
+  });
+  it('does not show success for logout completed after unmount', async () => {
+    window.history.replaceState({}, '', '/admin/');
+    vi.spyOn(authApi, 'session').mockResolvedValue({ data: { username: 'staff', role: 'staff', expires_at: '2030-01-01' } });
+    vi.spyOn(galleryApi, 'list').mockResolvedValue({ data: [], total: 0, page: 1, page_size: 1 });
+    let resolveLogout!: (value: { data: { ok: boolean } }) => void;
+    vi.spyOn(authApi, 'logout').mockImplementation(() => new Promise((resolve) => { resolveLogout = resolve; }));
+    const successToast = vi.spyOn(toast, 'success');
+    const view = render(<AdminApp />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign out' }));
+    view.unmount();
+    await act(async () => { resolveLogout({ data: { ok: true } }); await Promise.resolve(); });
+    expect(successToast).not.toHaveBeenCalled();
+  });
   it('does not accept a session response after its app unmounts', async () => {
     window.history.replaceState({}, '', '/admin/');
     queryClient.setQueryData(authKeys.session(), null);
@@ -86,10 +117,12 @@ describe('admin authentication shell', () => {
     window.history.replaceState({}, '', '/admin/login');
     vi.spyOn(authApi, 'session').mockRejectedValue(new ApiError(401, 'UNAUTHORIZED', 'Expired'));
     vi.spyOn(authApi, 'login').mockRejectedValue(new ApiError(401, 'UNAUTHORIZED', 'Invalid'));
+    const errorToast = vi.spyOn(toast, 'error');
     const user = userEvent.setup(); render(<AdminApp />);
     await user.type(await screen.findByLabelText('Username'), 'staff'); await user.type(screen.getByLabelText('Password'), 'wrong');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid username or password');
+    await waitFor(() => expect(errorToast).toHaveBeenCalledOnce());
+    expect(errorToast).toHaveBeenCalledWith('Invalid username or password.');
     expect(window.location.pathname).toBe('/admin/login');
   });
   it('shows not found instead of the dashboard for an unknown route', async () => {
@@ -135,6 +168,7 @@ describe('admin authentication shell', () => {
   });
 
   it('logs in, displays the empty dashboard, and signs out', async () => {
+    const successToast = vi.spyOn(toast, 'success');
     window.history.replaceState({}, '', '/admin/login');
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const path = String(input);
@@ -157,10 +191,13 @@ describe('admin authentication shell', () => {
     await user.type(screen.getByLabelText('Password'), 'secret');
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByText('No gallery cases yet.')).toBeInTheDocument();
+    expect(successToast).toHaveBeenCalledExactlyOnceWith('Signed in successfully.');
     queryClient.setQueryData(['private', 'record'], { secret: 'old session' });
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     await waitFor(() => expect(window.location.pathname).toBe('/admin/login'));
     expect(queryClient.getQueryData(['private', 'record'])).toBeUndefined();
+    expect(successToast).toHaveBeenCalledTimes(2);
+    expect(successToast).toHaveBeenLastCalledWith('Signed out successfully.');
   });
 
   it('returns to login when a gallery request finds an expired session', async () => {

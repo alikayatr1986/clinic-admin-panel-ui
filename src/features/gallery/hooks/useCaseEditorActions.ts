@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState } from 'react';
 import { ApiError } from '../../../lib/api';
 import { fieldErrors } from '../../../lib/form-errors';
@@ -25,6 +26,7 @@ export function useCaseEditorActions({
       onExpired();
       return;
     }
+    toast.error('The case action failed. Check the details and try again.');
     setError(bannerFor(f));
     setSErr(fieldErrors(f));
   }

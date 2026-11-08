@@ -1,3 +1,5 @@
+import { toast } from 'sonner';
+import { ApiError } from '../../../lib/api';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGalleryActions } from './useGalleryActions';
@@ -53,6 +55,7 @@ export function useCaseEditorUpload({
       setPendingFile(null);
       setProgress(100);
       setImageBroken(false);
+      toast.success('Image uploaded.');
       setNotice('Upload complete. Review the new image and save any pending form changes.');
       try {
         const refCase = await refetchCase();
@@ -60,8 +63,9 @@ export function useCaseEditorUpload({
           queryClient.setQueryData(galleryKeys.detail(item.id), { data: refCase });
           if (!getIsDirty()) reset(formFromCase(refCase));
         }
-      } catch (f) {
-        onFail(f);
+      } catch (failure) {
+        if (failure instanceof ApiError && failure.status === 401) onFail(failure);
+        setNotice('Image uploaded, but the case could not be refreshed. Retry before continuing.');
       }
     } catch (f) {
       onFail(f);

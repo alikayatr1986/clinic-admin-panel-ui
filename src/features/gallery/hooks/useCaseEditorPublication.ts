@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGalleryActions } from './useGalleryActions';
@@ -40,6 +41,7 @@ export function useCaseEditorPublication({
     try {
       const r = await actions.preview.mutateAsync({ id: item.id, revision: item.revision });
       setPreview(r.data);
+      toast.success('Preview created.');
     } catch (f) {
       onFail(f);
     } finally {
@@ -61,6 +63,7 @@ export function useCaseEditorPublication({
       queryClient.setQueryData(galleryKeys.detail(item.id), { data: r.data });
       reset(formFromCase(r.data));
       setPreview(null);
+      toast.success(published ? 'Case published.' : 'Case unpublished.');
       setNotice(published ? 'Case published.' : 'Case unpublished.');
     } catch (f) {
       onFail(f);

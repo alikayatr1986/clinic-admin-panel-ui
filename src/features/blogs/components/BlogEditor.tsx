@@ -1,12 +1,19 @@
+import { toast } from 'sonner';
 import { useAdminNavigation } from '../../../lib/admin-navigation';
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { blogEditorSchema } from '../schemas/blog-editor.schema';
+import { contentProgress } from '../utils/blog-progress.utils';
 import { ApiError } from '../../../lib/api';
+import { fieldErrors } from '../../../lib/form-errors';
 import { useQueryClient } from '@tanstack/react-query';
 import { blogKeys } from '../hooks/blog.keys';
 import { useBlogEditorReads } from '../hooks/useBlogReads';
 import { useSaveBlogPost, useUploadBlogCover } from '../hooks/useBlogMutations';
 import type {
   BlogEditorProps,
+  BlogEditorFormValues,
   BlogRequiredProps,
   BlogBodyBlock,
   BlogDraftFormState as FormState,
@@ -19,6 +26,8 @@ import { useBlogDraft } from '../context/BlogDraftContext';
 import { BlogBody, BlogPreview } from './BlogPreview';
 import { BlogPublishPanel } from './BlogPublishPanel';
 import { BlogGenerator } from './BlogGenerator';
+import { BlogGuidedNavigation } from './guided-editor/BlogGuidedNavigation';
+import type { BlogCoverDraft, BlogGuidedStep } from '../types/blogs.types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -114,12 +123,19 @@ function BlogEditorContent({
   const uploadCover = useUploadBlogCover();
   const initialDraft = useRef(draft);
   const [locale, setLocale] = useState<BlogLocale>('en');
-  const [forms, setForms] = useState<Record<BlogLocale, FormState> | null>(null);
+  const [step, setStep] = useState<BlogGuidedStep>('Details');
+  const stageHeading = useRef<HTMLHeadingElement>(null);
+  const editorForm = useForm<BlogEditorFormValues>({ defaultValues: { forms: null }, resolver: zodResolver(blogEditorSchema) });
+  const forms = useWatch({ control: editorForm.control, name: 'forms' });
+  function setForms(value: Record<BlogLocale, FormState> | null | ((previous: Record<BlogLocale, FormState> | null) => Record<BlogLocale, FormState> | null)) {
+    editorForm.setValue('forms', typeof value === 'function' ? value(editorForm.getValues('forms')) : value);
+  }
   const [saved, setSaved] = useState<Record<BlogLocale, FormState> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [fields, setFields] = useState<Record<string, string>>({});
+  const [errorLocale, setErrorLocale] = useState<BlogLocale>('en');
   const [busy, setBusy] = useState<null | 'save' | 'upload' | 'lifecycle' | 'refresh'>(null);
   const [attempt, setAttempt] = useState(0);
   const refreshVersion = useRef(0);
@@ -130,16 +146,20 @@ function BlogEditorContent({
   const [fresh, setFresh] = useState(true);
   const [localPreview, setLocalPreview] = useState(false);
   const preview = routerNavigation ? routerNavigation.routeId === 'blog-preview' : localPreview;
-  const [file, setFile] = useState<File | null>(null);
-  const [rights, setRights] = useState('');
-  const [focalX, setFocalX] = useState(0.5);
-  const [focalY, setFocalY] = useState(0.5);
+  const [covers, setCovers] = useState<Record<BlogLocale, BlogCoverDraft>>({
+    en: { file: null, rights: '', focalX: 0.5, focalY: 0.5 },
+    ar: { file: null, rights: '', focalX: 0.5, focalY: 0.5 },
+  });
+  const { file, rights, focalX, focalY } = covers[locale];
+  function updateCover(patch: Partial<BlogCoverDraft>) {
+    setCovers((previous) => ({ ...previous, [locale]: { ...previous[locale], ...patch } }));
+  }
   const [progress, setProgress] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const dirty = useMemo(
-    () => Boolean(forms && saved && JSON.stringify(forms) !== JSON.stringify(saved)) || Boolean(file),
-    [forms, saved, file]
+    () => Boolean(forms && saved && JSON.stringify(forms) !== JSON.stringify(saved)) || Boolean(covers.en.file || covers.ar.file),
+    [forms, saved, covers]
   );
 
   useEffect(() => {
@@ -156,10 +176,10 @@ function BlogEditorContent({
         setSaved(structuredClone(value));
         if (stored) {
           setLocale(stored.locale);
-          setFile(stored.file);
-          setRights(stored.rights);
-          setFocalX(stored.focalX);
-          setFocalY(stored.focalY);
+          setCovers(stored.covers ?? {
+            en: stored.locale === 'en' ? { file: stored.file, rights: stored.rights, focalX: stored.focalX, focalY: stored.focalY } : { file: null, rights: '', focalX: 0.5, focalY: 0.5 },
+            ar: stored.locale === 'ar' ? { file: stored.file, rights: stored.rights, focalX: stored.focalX, focalY: stored.focalY } : { file: null, rights: '', focalX: 0.5, focalY: 0.5 },
+          });
         }
         setFresh(true);
         setError('');
@@ -186,8 +206,8 @@ function BlogEditorContent({
   }, [post, saved, fresh, busy]);
 
   useEffect(() => {
-    if (forms && saved) saveForPost(postID, { forms, saved, locale, file, rights, focalX, focalY, dirty });
-  }, [postID, forms, saved, locale, file, rights, focalX, focalY, dirty, saveForPost]);
+    if (forms && saved) saveForPost(postID, { forms, saved, locale, file, rights, focalX, focalY, covers, dirty });
+  }, [postID, forms, saved, locale, file, rights, focalX, focalY, covers, dirty, saveForPost]);
 
   useEffect(() => {
     if (!preview && wasPreview.current) previewTrigger.current?.focus();
@@ -236,6 +256,10 @@ function BlogEditorContent({
       }
       return { ...all, [locale]: { ...all[locale], [key]: value } };
     });
+    if (locale === errorLocale) {
+      const serverKey = ({ categoryID: 'category_id', author: 'author_name', reviewer: 'reviewer_attribution', coverAlt: 'cover_alt', seoTitle: 'seo_title', seoDescription: 'seo_description', blocks: 'body' } as Partial<Record<keyof FormState, string>>)[key] ?? key;
+      setFields((previous) => Object.fromEntries(Object.entries(previous).filter(([field]) => field !== serverKey && !field.startsWith(`${serverKey}.`))));
+    }
     setNotice('');
   }
 
@@ -301,8 +325,7 @@ function BlogEditorContent({
     }
   }
 
-  async function save(event: FormEvent) {
-    event.preventDefault();
+  async function save() {
     if (operationLock.current || !fresh) return;
     const changed = LOCALES.filter((lang) => JSON.stringify(forms![lang]) !== JSON.stringify(saved![lang]));
     if (!changed.length) {
@@ -357,16 +380,23 @@ function BlogEditorContent({
           } as typeof baseline;
           done.push(lang);
         } catch (failure) {
+          if (!(failure instanceof ApiError && failure.status === 401)) toast.error(`${LOCALE_NAME[lang]} was not saved${done.length ? `; ${done.map((l) => LOCALE_NAME[l]).join(', ')} saved` : ''}. Check the details and try again.`);
           setError(
             `${LOCALE_NAME[lang]} was not saved${done.length ? ` (${done.map((l) => LOCALE_NAME[l]).join(', ')} saved)` : ''}. ${failureMessage(failure, onExpired)}`
           );
-          if (failure instanceof ApiError) setFields(failure.fields ?? {});
+          const mapped = fieldErrors(failure);
+          setFields(mapped);
+          setErrorLocale(lang);
+          const firstField = Object.keys(mapped)[0];
+          if (firstField) jumpToField(lang, firstField);
+          else { setLocale(lang); window.setTimeout(() => document.getElementById('blog-error-summary')?.focus(), 0); }
           break;
         }
       }
       if (done.length) {
         setSaved(baseline);
         setNotice(`${done.map((l) => LOCALE_NAME[l]).join(' and ')} saved.`);
+        if (done.length === changed.length) toast.success(`${done.map((l) => LOCALE_NAME[l]).join(' and ')} saved.`);
         await refresh(revision, baseline);
       }
     } catch (failure) {
@@ -377,11 +407,21 @@ function BlogEditorContent({
     }
   }
 
+  function selectStep(next: BlogGuidedStep) {
+    if (next === step || next === 'Start') return;
+    setStep(next);
+    window.setTimeout(() => stageHeading.current?.focus(), 0);
+  }
+
   function jumpToField(lang: BlogLocale, field: string) {
     setLocale(lang);
-    // Wait for the locale switch to render before focusing.
+    const root = field.split(/[.[]/)[0];
+    const aliases: Record<string, string> = { author_name: 'author', reviewer_attribution: 'reviewer', category_id: 'category', cover_alt: 'cover-alt', cover_media_id: 'cover', seo_title: 'seo-title', seo_description: 'seo-description', references: 'references' };
+    const targetField = aliases[root] ?? root;
+    setStep(['body', 'references', 'seo-title', 'seo-description'].includes(targetField) ? 'Content' : ['cover', 'cover-alt'].includes(targetField) ? 'Cover' : 'Details');
+    // Wait for the locale and stage switch to render before focusing.
     window.setTimeout(() => {
-      const target = document.getElementById(`blog-field-${field}`);
+      const target = document.getElementById(`blog-field-${targetField}`) ?? document.getElementById('blog-error-summary');
       target?.scrollIntoView?.({ block: 'center' });
       target?.focus();
     }, 0);
@@ -393,16 +433,20 @@ function BlogEditorContent({
     setBusy('upload');
     setError('');
     setProgress(0);
+    let uploaded = false;
     try {
       const result = await uploadCover.mutateAsync({ id: currentPost.id, file, expectedRevision: currentPost.aggregate_revision, rights, focalX, focalY, onProgress: setProgress });
       queryClient.setQueryData<BlogDetail>(blogKeys.detail(currentPost.id), (p) => p && { ...p, aggregate_revision: result.aggregate_revision });
       setForms((all) => all && { ...all, [locale]: { ...all[locale], coverMediaID: result.media_id } });
-      setFile(null);
-      if (fileRef.current) fileRef.current.value = '';
+      setCovers((previous) => ({ ...previous, [locale]: { ...previous[locale], file: null } }));
+      if (fileRef.current && fileRef.current.dataset.locale === locale) fileRef.current.value = '';
+      uploaded = true;
+      toast.success('Cover uploaded.');
       setNotice('Cover uploaded. Save this locale draft to use it; other unsaved fields remain unsaved.');
       await refresh(result.aggregate_revision);
     } catch (failure) {
-      setError(failureMessage(failure, onExpired));
+      if (!(failure instanceof ApiError && failure.status === 401) && !uploaded) toast.error('Cover upload failed. Try again.');
+      setError(uploaded && !(failure instanceof ApiError && failure.status === 401) ? 'Cover uploaded, but saved details could not be refreshed. Retry saved details.' : failureMessage(failure, onExpired));
     } finally {
       operationLock.current = false;
       setBusy(null);
@@ -459,6 +503,16 @@ function BlogEditorContent({
         </header>
       </Card>
 
+      <Card className="p-4 space-y-4">
+        <BlogGuidedNavigation current={step} onSelect={selectStep} />
+        <h2 ref={stageHeading} tabIndex={-1} className="text-xl font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+          Step {['Start', 'Details', 'Content', 'Cover', 'Review and publish'].indexOf(step) + 1} of 5: {step}
+        </h2>
+        <p className="text-sm text-slate-600">Local progress is based on the current {LOCALE_NAME[locale]} draft, not saved publication readiness.</p>
+        {(step === 'Details' || step === 'Content') && <p role="status" className="text-sm">{step} · {locale === errorLocale && Object.keys(fields).length ? 'Needs attention: check server validation' : step === 'Details' ? (form.slug.trim() && form.categoryID && form.title.trim() && form.excerpt.trim() && form.author.trim() ? 'Required information present' : 'Incomplete') : contentProgress(form)}</p>}
+        {step === 'Cover' && <p role="status" className="text-sm">Cover · {file && !rights.trim() ? 'Needs attention: add a rights/source record' : !form.coverAlt.trim() || (!file && !form.coverMediaID) ? 'Incomplete' : file ? 'Required information present locally' : 'Saved media readiness unknown'}</p>}
+      </Card>
+
       {!fresh && (
         <Card role="alert" className="p-4">
           <p>Saved details need refreshing. Local EN/AR text is preserved. Compare the saved preview before saving again.</p>
@@ -499,31 +553,40 @@ function BlogEditorContent({
           onBusy={(value) => setBusy(value ? 'lifecycle' : null)}
           onRefresh={refresh}
           onDeleted={onDeleted}
+          onExpired={onExpired}
           onJump={jumpToField}
         />
       )}
 
+      <div hidden={step !== 'Content'}>
       {!options.generation_enabled ? (
         <Card aria-label="AI drafting" className="p-6">
           <h2 className="text-xl font-semibold">AI drafting</h2>
           <p className="mt-2 text-slate-600">AI drafting is unavailable. You can continue writing and saving this article manually.</p>
         </Card>
       ) : (
-        <BlogGenerator
-          postID={post.id}
-          locale={locale}
-          baseRevision={post.aggregate_revision}
-          dirty={dirty}
-          currentDraft={{
-            title: form.title,
-            excerpt: form.excerpt,
-            seoTitle: form.seoTitle,
-            seoDescription: form.seoDescription,
-          }}
-          onRefresh={refresh}
-          onApplied={(msg) => setNotice(msg)}
-        />
+        LOCALES.map((language) => (
+          <BlogGenerator
+              key={language}
+              active={step === 'Content' && locale === language}
+              postID={post.id}
+              locale={language}
+              baseRevision={post.aggregate_revision}
+              dirty={dirty}
+              currentDraft={{
+                title: forms[language].title,
+                excerpt: forms[language].excerpt,
+                seoTitle: forms[language].seoTitle,
+                seoDescription: forms[language].seoDescription,
+              }}
+              onRefresh={refresh}
+              onExpired={onExpired}
+              onApplied={(msg) => setNotice(msg)}
+            />
+        ))
       )}
+
+      </div>
 
       <Tabs value={locale} onValueChange={(val) => setLocale(val as BlogLocale)}>
         <div className="flex flex-wrap items-center gap-3">
@@ -556,12 +619,11 @@ function BlogEditorContent({
           </p>
         )}
         {error && (
-          <div role="alert" className="mt-4 border border-destructive/20 bg-destructive/10 text-destructive rounded-md p-4">
+          <div id="blog-error-summary" tabIndex={-1} role="alert" className="mt-4 border border-destructive/20 bg-destructive/10 text-destructive rounded-md p-4">
             <p>{error}</p>
+            {Object.keys(fields).length > 0 && <p>Fields for {LOCALE_NAME[errorLocale]}:</p>}
             {Object.entries(fields).map(([k, v]) => (
-              <p key={k}>
-                {k}: {v}
-              </p>
+              <p key={k}><Button type="button" variant="link" className="p-0 h-auto" onClick={() => jumpToField(errorLocale, k)}>{k}: {v}</Button></p>
             ))}
             {error.includes('This draft changed') && (
               <Button
@@ -584,15 +646,19 @@ function BlogEditorContent({
         )}
 
         <TabsContent value={locale} className="mt-6">
-          <form id="blog-editor-form" onSubmit={save} dir={locale === 'ar' ? 'rtl' : 'ltr'} className="space-y-6">
+          <form id="blog-editor-form" onSubmit={editorForm.handleSubmit(save)} dir={locale === 'ar' ? 'rtl' : 'ltr'} className="space-y-6">
+        <div hidden={step !== 'Details'}>
         <Card className="p-6">
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
               <Label htmlFor="blog-field-title">
                 <Req>Title</Req>
               </Label>
+              {locale === errorLocale && fields.title && <p id="blog-error-title" className="text-sm text-destructive">{fields.title}</p>}
               <Input
                 id="blog-field-title"
+                aria-invalid={locale === errorLocale && Boolean(fields.title)}
+                aria-describedby={locale === errorLocale && fields.title ? "blog-error-title" : undefined}
                 aria-required="true"
                 value={form.title}
                 maxLength={180}
@@ -601,9 +667,12 @@ function BlogEditorContent({
               />
             </div>
             <div>
-              <Label htmlFor="blog-field-slug">Slug</Label>
+              <Label htmlFor="blog-field-slug"><Req>Slug</Req></Label>
+              {locale === errorLocale && fields.slug && <p id="blog-error-slug" className="text-sm text-destructive">{fields.slug}</p>}
               <Input
                 id="blog-field-slug"
+                aria-invalid={locale === errorLocale && Boolean(fields.slug)}
+                aria-describedby={locale === errorLocale && fields.slug ? "blog-error-slug" : undefined}
                 disabled={Boolean(post.first_published_at)}
                 value={form.slug}
                 onChange={(e) => update('slug', e.target.value)}
@@ -611,9 +680,12 @@ function BlogEditorContent({
               />
             </div>
             <div>
-              <Label htmlFor="blog-field-category">Category</Label>
+              <Label htmlFor="blog-field-category"><Req>Category</Req></Label>
+              {locale === errorLocale && fields.category_id && <p id="blog-error-category" className="text-sm text-destructive">{fields.category_id}</p>}
               <select
                 id="blog-field-category"
+                aria-invalid={locale === errorLocale && Boolean(fields.category_id)}
+                aria-describedby={locale === errorLocale && fields.category_id ? "blog-error-category" : undefined}
                 value={form.categoryID}
                 onChange={(e) => update('categoryID', e.target.value)}
                 className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
@@ -634,8 +706,11 @@ function BlogEditorContent({
               <Label htmlFor="blog-field-author">
                 <Req>Public author</Req>
               </Label>
+              {locale === errorLocale && fields.author_name && <p id="blog-error-author" className="text-sm text-destructive">{fields.author_name}</p>}
               <Input
                 id="blog-field-author"
+                aria-invalid={locale === errorLocale && Boolean(fields.author_name)}
+                aria-describedby={locale === errorLocale && fields.author_name ? "blog-error-author" : undefined}
                 aria-required="true"
                 value={form.author}
                 maxLength={120}
@@ -647,8 +722,11 @@ function BlogEditorContent({
               <Label htmlFor="blog-field-excerpt">
                 <Req>Excerpt</Req>
               </Label>
+              {locale === errorLocale && fields.excerpt && <p id="blog-error-excerpt" className="text-sm text-destructive">{fields.excerpt}</p>}
               <Textarea
                 id="blog-field-excerpt"
+                aria-invalid={locale === errorLocale && Boolean(fields.excerpt)}
+                aria-describedby={locale === errorLocale && fields.excerpt ? "blog-error-excerpt" : undefined}
                 aria-required="true"
                 value={form.excerpt}
                 maxLength={360}
@@ -659,31 +737,24 @@ function BlogEditorContent({
             </div>
             <div>
               <Label htmlFor="blog-field-reviewer">Reviewer attribution (optional)</Label>
+              {locale === errorLocale && fields.reviewer_attribution && <p id="blog-error-reviewer" className="text-sm text-destructive">{fields.reviewer_attribution}</p>}
               <Input
                 id="blog-field-reviewer"
+                aria-invalid={locale === errorLocale && Boolean(fields.reviewer_attribution)}
+                aria-describedby={locale === errorLocale && fields.reviewer_attribution ? "blog-error-reviewer" : undefined}
                 value={form.reviewer}
                 onChange={(e) => update('reviewer', e.target.value)}
                 className="mt-2 w-full"
               />
             </div>
-            <div>
-              <Label htmlFor="blog-field-cover-alt">
-                <Req>Cover alt text</Req>
-              </Label>
-              <Input
-                id="blog-field-cover-alt"
-                aria-required="true"
-                value={form.coverAlt}
-                maxLength={300}
-                onChange={(e) => update('coverAlt', e.target.value)}
-                className="mt-2 w-full"
-              />
-            </div>
+
           </div>
         </Card>
 
+        </div>
+        <div hidden={step !== 'Content'}>
         <Card id="blog-field-body" tabIndex={-1} className="p-6">
-          <h2 className="text-xl font-semibold">Structured body</h2>
+          <h2 className="text-xl font-semibold">Structured body (required)</h2>
           <div className="mt-3 flex flex-wrap gap-2" dir="ltr">
             {(['paragraph', 'heading', 'list', 'blockquote'] as const).map((type) => (
               <Button type="button" variant="outline" size="sm" key={type} onClick={() => addBlock(type)}>
@@ -854,8 +925,8 @@ function BlogEditorContent({
           </Card>
         )}
 
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold">References</h2>
+        <Card id="blog-field-references" tabIndex={-1} className="p-6">
+          <h2 className="text-xl font-semibold">References (optional)</h2>
           {form.references.map((ref, i) => (
             <div key={i} className="mt-3 grid gap-2 sm:grid-cols-2">
               <Input
@@ -903,9 +974,12 @@ function BlogEditorContent({
         <Card className="p-6">
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
-              <Label htmlFor="blog-field-seo-title">SEO title</Label>
+              <Label htmlFor="blog-field-seo-title">SEO title (optional)</Label>
+              {locale === errorLocale && fields.seo_title && <p id="blog-error-seo-title" className="text-sm text-destructive">{fields.seo_title}</p>}
               <Input
                 id="blog-field-seo-title"
+                aria-invalid={locale === errorLocale && Boolean(fields.seo_title)}
+                aria-describedby={locale === errorLocale && fields.seo_title ? "blog-error-seo-title" : undefined}
                 value={form.seoTitle}
                 maxLength={70}
                 onChange={(e) => update('seoTitle', e.target.value)}
@@ -913,9 +987,12 @@ function BlogEditorContent({
               />
             </div>
             <div>
-              <Label htmlFor="blog-field-seo-description">SEO description</Label>
+              <Label htmlFor="blog-field-seo-description">SEO description (optional)</Label>
+              {locale === errorLocale && fields.seo_description && <p id="blog-error-seo-description" className="text-sm text-destructive">{fields.seo_description}</p>}
               <Textarea
                 id="blog-field-seo-description"
+                aria-invalid={locale === errorLocale && Boolean(fields.seo_description)}
+                aria-describedby={locale === errorLocale && fields.seo_description ? "blog-error-seo-description" : undefined}
                 value={form.seoDescription}
                 maxLength={180}
                 onChange={(e) => update('seoDescription', e.target.value)}
@@ -924,30 +1001,51 @@ function BlogEditorContent({
             </div>
           </div>
         </Card>
+        </div>
+        <div hidden={step !== 'Cover'}><Card className="p-6">            <div>
+              <Label htmlFor="blog-field-cover-alt">
+                <Req>Cover alt text</Req>
+              </Label>
+              {locale === errorLocale && fields.cover_alt && <p id="blog-error-cover-alt" className="text-sm text-destructive">{fields.cover_alt}</p>}
+              <Input
+                id="blog-field-cover-alt"
+                aria-invalid={locale === errorLocale && Boolean(fields.cover_alt)}
+                aria-describedby={locale === errorLocale && fields.cover_alt ? "blog-error-cover-alt" : undefined}
+                aria-required="true"
+                value={form.coverAlt}
+                maxLength={300}
+                onChange={(e) => update('coverAlt', e.target.value)}
+                className="mt-2 w-full"
+              />
+            </div></Card></div>
       </form>
         </TabsContent>
       </Tabs>
 
-      <Card className="p-6">
+      <Card className="p-6" hidden={step !== 'Cover'}>
         <h2 className="text-xl font-semibold">Cover upload for {locale.toUpperCase()}</h2>
+        <p className="mt-2 text-sm text-slate-600">Upload the image separately, then save this edition to use the uploaded cover.</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="blog-field-cover">Image</Label>
             <input
               id="blog-field-cover"
+              key={locale}
               ref={fileRef}
+              data-locale={locale}
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => updateCover({ file: e.target.files?.[0] ?? null })}
               className="mt-2 block max-w-full text-sm"
             />
+            {file && <p className="mt-1 text-sm">Selected: {file.name}</p>}
           </div>
           <div>
             <Label htmlFor="blog-field-rights">Rights/source record</Label>
             <Input
               id="blog-field-rights"
               value={rights}
-              onChange={(e) => setRights(e.target.value)}
+              onChange={(e) => updateCover({ rights: e.target.value })}
               className="mt-2 w-full"
             />
           </div>
@@ -960,7 +1058,7 @@ function BlogEditorContent({
               max="1"
               step="0.01"
               value={focalX}
-              onChange={(e) => setFocalX(Number(e.target.value))}
+              onChange={(e) => updateCover({ focalX: Number(e.target.value) })}
               className="mt-2 w-full cursor-pointer accent-primary"
             />
           </div>
@@ -973,7 +1071,7 @@ function BlogEditorContent({
               max="1"
               step="0.01"
               value={focalY}
-              onChange={(e) => setFocalY(Number(e.target.value))}
+              onChange={(e) => updateCover({ focalY: Number(e.target.value) })}
               className="mt-2 w-full cursor-pointer accent-primary"
             />
           </div>

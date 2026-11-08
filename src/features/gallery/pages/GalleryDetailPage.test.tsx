@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -168,6 +169,17 @@ describe('GalleryDetailPage', () => {
       expect(withdrawSpy).toHaveBeenCalledWith('consent-99');
       expect(getSpy).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('reports a failed refresh after consent was withdrawn', async () => {
+    vi.spyOn(galleryApi, 'get').mockResolvedValueOnce({ data: mockCase }).mockRejectedValueOnce(new ApiError(500, 'FAILURE', 'Refresh failed'));
+    vi.spyOn(galleryApi, 'withdrawConsent').mockResolvedValue({ data: { affected_cases: 1 } });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const errorToast = vi.spyOn(toast, 'error');
+    render(<GalleryDetailPage caseID="case-test-1" onExpired={vi.fn()} onEdit={vi.fn()} onBack={vi.fn()} />, { wrapper: createWrapper() });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Withdraw consent' }));
+    await waitFor(() => expect(errorToast).toHaveBeenCalledWith(expect.stringContaining('Consent was withdrawn, but the case could not be refreshed')));
   });
 
   it('does not withdraw consent if confirmation is cancelled', async () => {

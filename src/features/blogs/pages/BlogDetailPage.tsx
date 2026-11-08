@@ -1,5 +1,6 @@
+import { toast } from 'sonner';
 import { useState } from 'react';
-import { describeError } from '../../../lib/api';
+import { ApiError, describeError } from '../../../lib/api';
 import { useBlogDetail } from '../hooks/useBlogDetail';
 import { useBlogOptions } from '../hooks/useBlogOptions';
 import { useDeleteBlogPost } from '../hooks/useBlogMutations';
@@ -67,9 +68,11 @@ export function BlogDetailPage({
     setDeleteError('');
     try {
       await deletePost.mutateAsync(postID);
+      toast.success('Article deleted.');
       onDeleted();
     } catch (err) {
-      setDeleteError(describeError(err));
+      if (err instanceof ApiError && err.status === 401) onExpired();
+      else { toast.error('Could not delete the article. Try again.'); setDeleteError(describeError(err)); }
     } finally {
       setDeleting(false);
     }

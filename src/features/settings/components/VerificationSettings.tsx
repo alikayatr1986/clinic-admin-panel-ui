@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -47,8 +48,10 @@ function VerificationForm({ setting, onExpired }: VerificationFormProps) {
       reset({ ...result.data, secret: '' });
       setServerChanged(false);
       setMessage('Settings saved.');
+      toast.success('Verification settings saved.');
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) onExpired?.();
+      if (error instanceof ApiError && error.status === 401) { onExpired?.(); setMessage('Session expired'); return; }
+      toast.error('Unable to save verification settings. Your draft has been preserved.');
       const mapped = fieldErrors(error);
       for (const field of [...fields.map(item => item[0]), 'enabled', 'fallback_to_sms'] as const) if (mapped[field]) setError(field, { message: mapped[field] });
       setMessage(error instanceof ApiError ? error.message : 'Could not save settings. Your draft has been preserved.');

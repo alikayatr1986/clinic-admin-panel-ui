@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { adminRequest, adminUpload, ApiError } from './api';
+import { adminBinaryRequest, adminRequest, adminUpload, ApiError } from './api';
 import { authApi } from '../features/auth/services/auth.service';
 
 afterEach(() => {
@@ -9,6 +9,15 @@ afterEach(() => {
 });
 
 describe('admin transport', () => {
+  it('preserves binary responses and error envelopes through the authenticated transport', async () => {
+    document.cookie = 'admin_csrf=test-token; Path=/';
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response('workbook', { headers: { 'X-Lead-Count': '1' } })).mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'FORBIDDEN', message: 'Denied' } }), { status: 403 }));
+    const response = await adminBinaryRequest('/admin/api/leads/export', { method: 'POST', body: '{}' });
+    expect(response.headers.get('X-Lead-Count')).toBe('1');
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ cache: 'no-store', credentials: 'same-origin' });
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).get('X-CSRF-Token')).toBe('test-token');
+    await expect(adminBinaryRequest('/admin/api/leads/export', { method: 'POST', body: '{}' })).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+  });
   it('sends JSON credentials without a CSRF header and keeps cookies same origin', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ data: { session_id: 'id' } }), { status: 200 }));
     await authApi.login('staff', 'secret');

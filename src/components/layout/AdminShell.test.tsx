@@ -3,9 +3,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AdminShell } from './AdminShell';
 import type { AdminSession } from '../../features/auth/types/auth.types';
+import { toast } from 'sonner';
 import { ApiError } from '../../lib/api';
 
+vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
+
 afterEach(() => {
+  vi.clearAllMocks();
   cleanup();
   vi.restoreAllMocks();
 });
@@ -53,7 +57,7 @@ describe('AdminShell component', () => {
     const user = userEvent.setup();
     const onLogout = vi.fn().mockRejectedValue(new ApiError(0, 'NETWORK_ERROR', 'Logout failed due to network'));
 
-    const { rerender } = render(
+    render(
       <AdminShell
         path="/admin/"
         session={mockSession}
@@ -68,22 +72,9 @@ describe('AdminShell component', () => {
     const signOutBtn = screen.getByRole('button', { name: 'Sign out' });
     await user.click(signOutBtn);
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Logout failed due to network');
-
-    // Route change clears logout error
-    rerender(
-      <AdminShell
-        path="/admin/blogs"
-        session={mockSession}
-        routeId="blog-list"
-        onNavigate={vi.fn()}
-        onLogout={onLogout} onExpired={vi.fn()}
-      >
-        <p>Blogs Content</p>
-      </AdminShell>
-    );
-
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(toast.error).toHaveBeenCalledOnce();
+    expect(toast.error).toHaveBeenCalledWith('Unable to sign out. Please try again.');
+    expect(screen.getByRole('button', { name: 'Sign out' })).not.toBeDisabled();
   });
 
   it('disables sign-out button and displays pending text while logout is unresolved', async () => {

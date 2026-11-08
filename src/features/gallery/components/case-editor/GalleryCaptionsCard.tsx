@@ -9,7 +9,7 @@ export function GalleryCaptionsCard({ register, serverErrors, clientErrors }: Ga
     <Card className="p-6">
       <CardTitle className="text-xl">Bilingual image descriptions</CardTitle>
       <CardDescription className="mt-2">
-        Save changed descriptions as drafts, then review and approve them in a second save before publishing.
+        Descriptions are optional. If you add a caption or approve a language, provide its image description. Save changes as drafts, then review and approve them in a second save before publishing.
       </CardDescription>
       <div className="mt-5 grid gap-6 lg:grid-cols-2">
         {(['en', 'ar'] as const).map((lang) => (

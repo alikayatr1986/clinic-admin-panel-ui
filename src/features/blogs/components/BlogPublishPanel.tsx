@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../../lib/api';
 import { useBlogHome } from '../hooks/useBlogReads';
@@ -74,6 +75,7 @@ export function BlogPublishPanel({
   onBusy,
   onRefresh,
   onDeleted,
+  onExpired,
   onJump,
 }: BlogPublishPanelProps) {
   const homeQuery = useBlogHome();
@@ -131,6 +133,7 @@ export function BlogPublishPanel({
 
   async function loadHome() {
     const result = await homeQuery.refetch();
+    if (result.error instanceof ApiError && result.error.status === 401) onExpired?.();
     if (result.isError && mounted.current) setError('Homepage settings are unavailable. Retry settings to choose a feature.');
   }
 
@@ -143,6 +146,7 @@ export function BlogPublishPanel({
     setNotice('');
     try {
       await action();
+      if (refreshAfter) toast.success(deleted ? 'Article deleted.' : success);
       if (deleted) {
         onDeleted();
         return;
@@ -153,12 +157,14 @@ export function BlogPublishPanel({
       if (refreshAfter) {
         try {
           await onRefresh();
-        } catch {
+        } catch (failure) {
+          if (failure instanceof ApiError && failure.status === 401) onExpired?.();
           setError('Action succeeded, but saved details could not be refreshed. Retry saved details before another publication action.');
         }
       }
       await loadHome();
     } catch (failure) {
+      if (failure instanceof ApiError && failure.status === 401) onExpired?.();
       const message =
         failure instanceof ApiError && failure.status === 409
           ? 'Conflict: saved revisions or homepage settings changed. Your local EN/AR text is preserved. Reload saved details or retry settings, compare, and try again.'
@@ -169,6 +175,7 @@ export function BlogPublishPanel({
           : failure instanceof Error
           ? failure.message
           : 'Request failed. Your local text is preserved.';
+      if (!(failure instanceof ApiError && failure.status === 401)) toast.error(failure instanceof Error && failure.message.startsWith('Some reviews were recorded') ? failure.message : 'The article action failed. Check the details and try again.');
       setError(
         message +
           (failure instanceof ApiError && failure.fields
@@ -335,16 +342,20 @@ export function BlogPublishPanel({
                   if (reviewCurrent) {
                     void run(
                       async () => {
+                        let recorded = 0;
                         try {
                           for (const kind of pending) {
                             await reviewPost.mutateAsync({ id: post.id, revisionID: review.revisionID, kind, reference: reference.trim() || undefined });
+                            recorded++;
                           }
                         } catch (failure) {
                           try {
                             await onRefresh();
-                          } catch {
+                          } catch (refreshFailure) {
+                            if (refreshFailure instanceof ApiError && refreshFailure.status === 401 && !(failure instanceof ApiError && failure.status === 401)) onExpired?.();
                             /* keep the original failure */
                           }
+                          if (recorded && !(failure instanceof ApiError && failure.status === 401)) throw new Error('Some reviews were recorded, but others failed. Reload saved details and retry.');
                           throw failure;
                         }
                       },

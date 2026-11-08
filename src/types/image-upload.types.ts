@@ -18,3 +18,4 @@ export interface ImageUploadProps {
   className?: string;
   children?: React.ReactNode;
 }
+

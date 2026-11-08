@@ -1,7 +1,7 @@
+import { toast } from 'sonner';
 import { useState, type FormEvent } from 'react';
 import { ApiError } from '../../../lib/api';
 import type { LoginPageProps } from '../types/auth.types';
-import { describeError } from '../utils/auth.utils';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,18 +10,17 @@ import { Button } from '@/components/ui/button';
 export function LoginPage({ onLogin }: LoginPageProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError('');
     setBusy(true);
     try {
       await onLogin(username, password);
     } catch (failure) {
-      if (failure instanceof ApiError && failure.status === 401) setError('Invalid username or password.');
-      else setError(describeError(failure));
+      toast.error(failure instanceof ApiError && failure.status === 401
+        ? 'Invalid username or password.'
+        : 'Unable to sign in. Please try again.');
     } finally {
       setBusy(false);
       setPassword('');
@@ -62,14 +61,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 onChange={(event) => setPassword(event.target.value)}
               />
             </div>
-            {error && (
-              <p
-                role="alert"
-                className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive"
-              >
-                {error}
-              </p>
-            )}
             <Button disabled={busy} type="submit" className="w-full">
               {busy ? 'Signing in…' : 'Sign in'}
             </Button>

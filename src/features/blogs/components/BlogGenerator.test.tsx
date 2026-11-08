@@ -36,6 +36,15 @@ describe('BlogGenerator', () => {
     onApplied: vi.fn(),
   };
 
+  it('handles expiry while restoring a generation job', async () => {
+    localStorage.setItem('blog_gen_job_post-1_en', 'saved-job');
+    vi.spyOn(blogsApi, 'getGeneration').mockRejectedValue(new ApiError(401, 'UNAUTHORIZED', 'Expired'));
+    const expired = vi.fn();
+    render(<BlogGenerator {...baseProps} onExpired={expired} />);
+    await waitFor(() => expect(expired).toHaveBeenCalledOnce());
+    expect(localStorage.getItem('blog_gen_job_post-1_en')).toBe('saved-job');
+  });
+
   it('validates required fields and privacy confirmation before queuing a job (AC-10.1)', async () => {
     render(<BlogGenerator {...baseProps} />);
 
@@ -90,6 +99,23 @@ describe('BlogGenerator', () => {
 
     expect(await screen.findByText('Status: queued')).toBeInTheDocument();
     expect(localStorage.getItem('blog_gen_job_post-1_en')).toBe('job-123');
+  });
+
+  it('retains a pending generation when the stage is hidden and later revisited', async () => {
+    let resolve!: (value: { data: BlogGenerationJob }) => void;
+    vi.spyOn(blogsApi, 'queueGeneration').mockReturnValue(new Promise((done) => { resolve = done; }));
+    const { rerender } = render(<BlogGenerator {...baseProps} />);
+    fireEvent.change(screen.getByPlaceholderText(/Rhinoplasty recovery timeline/i), { target: { value: 'Topic' } });
+    fireEvent.change(screen.getByPlaceholderText(/Specific guidance for style/i), { target: { value: 'Instructions' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /No patient data/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Start AI drafting for EN/i }));
+    await waitFor(() => expect(blogsApi.queueGeneration).toHaveBeenCalled());
+    rerender(<BlogGenerator {...baseProps} active={false} />);
+    expect(screen.queryByRole('button', { name: /Start AI drafting/i })).not.toBeInTheDocument();
+    await act(async () => resolve({ data: { id: 'job-hidden', post_id: 'post-1', language: 'en', status: 'queued', source_ids: [], created_at: '', updated_at: '' } }));
+    rerender(<BlogGenerator {...baseProps} active />);
+    expect(await screen.findByText('Status: queued')).toBeInTheDocument();
+    expect(localStorage.getItem('blog_gen_job_post-1_en')).toBe('job-hidden');
   });
 
   it('stores a late queued job for its original locale without replacing the current job', async () => {
@@ -255,6 +281,13 @@ describe('BlogGenerator', () => {
     expect(await screen.findByText(/Generated result \(review needed\)/i)).toBeInTheDocument();
     expect(screen.getByText('Generated Rhinoplasty Guide')).toBeInTheDocument();
     expect(screen.getByText('Current Title')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select title' }));
+    rerender(<BlogGenerator {...baseProps} dirty active={false} />);
+    expect(screen.queryByText(/Generated result \(review needed\)/i)).not.toBeInTheDocument();
+    rerender(<BlogGenerator {...baseProps} dirty active />);
+    expect(screen.getByRole('checkbox', { name: 'Select title' })).not.toBeChecked();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select title' }));
 
     // Apply button must be disabled due to dirty draft
     const applyBtn = screen.getByRole('button', { name: /Apply selected/i });

@@ -1,3 +1,5 @@
+import { ApiError } from '../../../../lib/api';
+import { toast } from 'sonner';
 import { Button } from "@/components/ui/button";
 import { CardFooter } from "@/components/ui/card";
 import { useGalleryActions } from "../../hooks/useGalleryActions";
@@ -41,7 +43,7 @@ export function GalleryDetailActions({
         onClick={() => {
           if (window.confirm("Delete this case?"))
             void perform(
-              () => actions.remove.mutateAsync({ id: item.id, revision: item.revision }),
+              async () => { await actions.remove.mutateAsync({ id: item.id, revision: item.revision }); toast.success('Case deleted.'); },
               onBack,
             );
         }}
@@ -57,7 +59,11 @@ export function GalleryDetailActions({
             if (window.confirm("Withdraw consent for all associated cases?"))
               void perform(async () => {
                 await actions.withdraw.mutateAsync(item.consent_id!);
-                await onRefetch();
+                toast.success('Consent withdrawn.');
+                try { await onRefetch(); } catch (failure) {
+                  if (failure instanceof ApiError && failure.status === 401) throw failure;
+                  throw new Error('Consent was withdrawn, but the case could not be refreshed. Retry loading the case.');
+                }
               });
           }}
         >

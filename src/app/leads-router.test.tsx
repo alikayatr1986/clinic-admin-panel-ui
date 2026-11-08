@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -56,9 +56,10 @@ describe('protected lead routes', () => {
     await user.selectOptions(screen.getByLabelText('Status'), 'qualified');
     await waitFor(() => expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'qualified', page: 1 }), expect.any(Array), expect.any(AbortSignal)));
     expect(window.location.search).toBe('');
-    await user.click(await screen.findByRole('link', { name: 'View details' }));
-    await waitFor(() => expect(window.location.pathname).toBe('/admin/leads/lead-1'));
-    await user.click(await screen.findByRole('link', { name: 'Back to leads' }));
+    await user.click(await screen.findByRole('link', { name: 'View details for Example patient' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Lead details' });
+    expect(await within(dialog).findByText('Example patient')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(window.location.pathname).toBe('/admin/leads'));
     expect(await screen.findByLabelText('Status')).toHaveValue('qualified');
     expect(window.location.search).toBe('');

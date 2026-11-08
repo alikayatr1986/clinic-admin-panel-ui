@@ -1,17 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { LeadDetail } from './LeadDetail';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { ApiError } from '../../../lib/api';
 import { getLeadFilters, setLeadFilters } from '../hooks/leadFilters';
-import { useLeadList, useLeadOptions } from '../hooks/useLeads';
+import { useLeadExport, useLeadList, useLeadOptions } from '../hooks/useLeads';
 import type { LeadFilters, LeadListProps } from '../types/leads.types';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 
-export function LeadList({ onExpired, onOpen }: LeadListProps) {
+export function LeadList({ onExpired }: LeadListProps) {
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const dirty = useRef(false);
+  const busy = useRef(false);
+  const trigger = useRef<HTMLAnchorElement | null>(null);
+  const fallback = useRef<HTMLElement | null>(null);
+  const handleDirtyChange = (value: boolean) => { dirty.current = value; };
+  const requestClose = () => {
+    if (busy.current) return;
+    if (dirty.current && !window.confirm('Discard your unsaved status selection?')) return;
+    dirty.current = false;
+    setSelectedId(null);
+  };
   const [state, setState] = useState(getLeadFilters);
   const { filters, identity } = state;
   const setFilters = (next: LeadFilters) => setState(setLeadFilters(next));
+  const exportMutation = useLeadExport();
+  const exporting = useRef(false);
   const options = useLeadOptions();
   const procedureCodes = options.data?.data ?? [];
   const query = useLeadList(filters, identity, procedureCodes, options.isSuccess);
@@ -19,17 +36,24 @@ export function LeadList({ onExpired, onOpen }: LeadListProps) {
   useEffect(() => {
     if (
       (options.error instanceof ApiError && options.error.status === 401) ||
-      (query.error instanceof ApiError && query.error.status === 401)
+      (query.error instanceof ApiError && query.error.status === 401) ||
+      (exportMutation.error instanceof ApiError && exportMutation.error.status === 401)
     ) {
       onExpired();
     }
-  }, [options.error, query.error, onExpired]);
+  }, [options.error, query.error, exportMutation.error, onExpired]);
 
   const optionsDenied =
     options.error instanceof ApiError && [401, 403].includes(options.error.status);
   const queryDenied =
     query.error instanceof ApiError && [401, 403].includes(query.error.status);
   const isDenied = optionsDenied || queryDenied;
+  useEffect(() => {
+    if (isDenied) {
+      setSelectedId(null);
+      dirty.current = false;
+    }
+  }, [isDenied]);
   const optionsError =
     options.error instanceof ApiError && options.error.status === 403
       ? 'Access denied. Administrator access is required.'
@@ -48,7 +72,34 @@ export function LeadList({ onExpired, onOpen }: LeadListProps) {
   const pages = Math.max(1, Math.ceil(total / filters.page_size));
 
   return (
-    <section aria-label="Lead browser" className="mt-8">
+    <section aria-label="Lead browser" className="mt-8" ref={fallback} tabIndex={-1}>
+      {!isDenied && (
+        <div className="mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm">Export includes all leads, regardless of filters or page.</p>
+            <Button type="button" variant="outline" disabled={exportMutation.isPending} onClick={() => {
+            if (exporting.current) return;
+            exporting.current = true;
+            exportMutation.mutate(undefined, { onSuccess: ({ count, blob }) => {
+              if (count === 0) return;
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = 'leads.xlsx';
+              link.click();
+              URL.revokeObjectURL(url);
+            }, onSettled: () => { exporting.current = false; } });
+            }}>Export all leads to Excel</Button>
+          </div>
+          <div aria-live="polite" className="mt-2 text-sm">
+            {exportMutation.isPending && 'Preparing export…'}
+            {exportMutation.isSuccess && (exportMutation.data.count === 0 ? 'There are no leads to export.' : 'Export downloaded.')}
+            {exportMutation.isError && !(exportMutation.error instanceof ApiError && exportMutation.error.status === 401) && (
+              <p role="alert">{exportMutation.error instanceof ApiError && exportMutation.error.status === 403 ? 'Access denied. Administrator access or a valid security token is required.' : exportMutation.error instanceof ApiError && exportMutation.error.code === 'LEAD_EXPORT_LIMIT' ? 'Export exceeds the 10,000 lead limit. Contact an administrator for help.' : 'Unable to export leads. Try again.'}</p>
+            )}
+          </div>
+        </div>
+      )}
       {!isDenied && (
         <Card>
           <CardContent className="p-5">
@@ -168,54 +219,44 @@ export function LeadList({ onExpired, onOpen }: LeadListProps) {
         <p className="mt-6">No leads match these filters.</p>
       ) : (
         <>
-          <ul className="mt-6 grid gap-4">
-            {rows.map((lead) => (
-              <li key={lead.id}>
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between gap-2">
-                      <CardTitle asChild className="text-lg min-w-0 break-words">
-                        <h2>{lead.name}</h2>
-                      </CardTitle>
-                      <Badge variant="outline">{lead.status}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-1 text-sm min-w-0 break-words">
-                    <p>Country: {lead.country}</p>
-                    <p>
-                      Method:{' '}
-                      {lead.preferred_contact === 'phone'
-                        ? 'Phone (legacy)'
-                        : lead.preferred_contact}
-                    </p>
-                    <p>Selected contact: {lead.primary_contact ?? 'Not available'}</p>
-                    <p>Procedure: {lead.procedure}</p>
-                  </CardContent>
-                  <CardFooter>
-                    <Button asChild variant="link" className="p-0 h-auto">
-                      <a
-                        href={`/admin/leads/${encodeURIComponent(lead.id)}`}
-                        onClick={(event) => {
-                          if (
-                            !event.metaKey &&
-                            !event.ctrlKey &&
-                            !event.shiftKey &&
-                            !event.altKey &&
-                            event.button === 0
-                          ) {
-                            event.preventDefault();
-                            onOpen(lead.id);
-                          }
-                        }}
-                      >
-                        View details
-                      </a>
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </li>
-            ))}
-          </ul>
+          <div className="mt-6 rounded-md border">
+            <Table aria-label="Leads">
+              <TableHeader><TableRow>
+                {['Name', 'Country', 'Procedure', 'Preferred contact', 'Selected contact', 'Status', 'Submitted', 'Actions'].map((heading) => (
+                  <TableHead key={heading} scope="col">{heading}</TableHead>
+                ))}
+              </TableRow></TableHeader>
+              <TableBody>
+                {rows.map((lead) => {
+                  const date = new Date(lead.created_at);
+                  return (
+                    <TableRow key={lead.id}>
+                      <TableCell className="min-w-40 break-words">{lead.name}</TableCell>
+                      <TableCell>{lead.country}</TableCell>
+                      <TableCell>{lead.procedure}</TableCell>
+                      <TableCell>{lead.preferred_contact === 'phone' ? 'Phone (legacy)' : lead.preferred_contact === 'phone_call' ? 'Phone call' : lead.preferred_contact}</TableCell>
+                      <TableCell className="min-w-40 break-all">{lead.primary_contact || 'Not available'}</TableCell>
+                      <TableCell><Badge variant="outline">{lead.status}</Badge></TableCell>
+                      <TableCell className="whitespace-nowrap">{Number.isNaN(date.getTime()) ? 'Not available' : date.toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Button asChild variant="link" className="p-0 h-auto">
+                          <a aria-label={`View details for ${lead.name}`} href={`/admin/leads/${encodeURIComponent(lead.id)}`} onClick={(event) => {
+                            if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.button === 0) {
+                              event.preventDefault();
+                              trigger.current = event.currentTarget;
+                              setSelectedId(lead.id);
+                            }
+                          }}>
+                            View details
+                          </a>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
           <nav aria-label="Lead pages" className="mt-6 flex items-center gap-4">
             <Button
               type="button"
@@ -239,6 +280,20 @@ export function LeadList({ onExpired, onOpen }: LeadListProps) {
           </nav>
         </>
       )}
+      <Dialog open={!isDenied && selectedId !== null} onOpenChange={(open) => { if (!open) requestClose(); }}>
+        <DialogContent
+          className="max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] overflow-y-auto md:max-w-3xl"
+          aria-describedby={undefined}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            if (trigger.current?.isConnected) trigger.current.focus();
+            else fallback.current?.focus();
+          }}
+        >
+          <DialogTitle>Lead details</DialogTitle>
+          {!isDenied && selectedId && <LeadDetail key={selectedId} id={selectedId} onExpired={onExpired} onDirtyChange={handleDirtyChange} onBusyChange={(value) => { busy.current = value; }} />}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

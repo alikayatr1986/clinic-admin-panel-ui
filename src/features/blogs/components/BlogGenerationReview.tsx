@@ -1,5 +1,4 @@
 import type { BlogGenerationReviewProps } from '../types/blogs.types';
-import { useState } from 'react';
 import type { BlogGenerationJob, BlogLocale } from '../types/blogs.types';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +9,8 @@ import { Label } from '@/components/ui/label';
 
 export function BlogGenerationReview({
   job,
+  selected,
+  onSelectedChange,
   currentDraft,
   locale,
   dirty,
@@ -19,18 +20,12 @@ export function BlogGenerationReview({
   onDiscard,
 }: BlogGenerationReviewProps) {
   const result = job.result;
-  const [selected, setSelected] = useState<Record<string, boolean>>({
-    title: true,
-    excerpt: true,
-    body: true,
-    seo_title: true,
-    seo_description: true,
-  });
+
 
   if (!result) return null;
 
   function toggle(field: string) {
-    setSelected((prev) => ({ ...prev, [field]: !prev[field] }));
+    onSelectedChange({ ...selected, [field]: !selected[field] });
   }
 
   const selectedFields = Object.keys(selected).filter((k) => selected[k]);

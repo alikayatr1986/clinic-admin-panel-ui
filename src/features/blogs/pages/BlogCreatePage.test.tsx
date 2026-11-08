@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -39,6 +40,7 @@ describe('BlogCreatePage', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading authoring options…');
     expect(await screen.findByRole('button', { name: 'Create draft' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'New article draft' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /1\. Start · Current/ })).toHaveAttribute('aria-current', 'step');
     expect(screen.getByLabelText('Category')).toHaveValue('cat-1');
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Ear hygiene guide' } });
@@ -51,6 +53,7 @@ describe('BlogCreatePage', () => {
 
   it('submits valid category, title, slug, and client-generated UUID idempotency key', async () => {
     vi.spyOn(blogsApi, 'options').mockResolvedValueOnce({ data: mockOptions });
+    const successToast = vi.spyOn(toast, 'success');
     const createSpy = vi.spyOn(blogsApi, 'create').mockResolvedValueOnce({ data: { id: 'new-1', aggregate_revision: 1 } });
     const onCreated = vi.fn();
 
@@ -73,6 +76,7 @@ describe('BlogCreatePage', () => {
         'Rhinoplasty guide'
       );
       expect(onCreated).toHaveBeenCalledWith('new-1');
+      expect(successToast).toHaveBeenCalledOnce();
     });
   });
 
@@ -104,6 +108,7 @@ describe('BlogCreatePage', () => {
   });
 
   it('retains form inputs after validation error to permit deliberate retry', async () => {
+    const errorToast = vi.spyOn(toast, 'error');
     vi.spyOn(blogsApi, 'options').mockResolvedValueOnce({ data: mockOptions });
     vi.spyOn(blogsApi, 'create')
       .mockRejectedValueOnce(new ApiError(422, 'VALIDATION', 'Slug already exists.'))
@@ -122,6 +127,7 @@ describe('BlogCreatePage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create draft' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Slug already exists.');
+    expect(errorToast).toHaveBeenCalledOnce();
     expect(screen.getByLabelText('Title')).toHaveValue('Unique Title');
     expect(screen.getByLabelText('Slug (optional)')).toHaveValue('custom-slug');
 
@@ -162,6 +168,7 @@ describe('BlogCreatePage', () => {
   });
 
   it('calls onExpired on 401 error during create and options loading', async () => {
+    const errorToast = vi.spyOn(toast, 'error');
     vi.spyOn(blogsApi, 'options').mockResolvedValueOnce({ data: mockOptions });
     vi.spyOn(blogsApi, 'create').mockRejectedValueOnce(new ApiError(401, 'UNAUTHORIZED', 'Session expired.'));
 
@@ -176,6 +183,7 @@ describe('BlogCreatePage', () => {
     fireEvent.click(submitBtn);
 
     await waitFor(() => expect(onExpired).toHaveBeenCalledOnce());
+    expect(errorToast).not.toHaveBeenCalled();
   });
 
   it('invokes onExpired when options loading fails with 401', async () => {
