@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -6,11 +6,12 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import type { TimeframeFormDialogProps } from '../types/settings.types';
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import type { TimeframeFormDialogProps } from "../types/settings.types";
 
 export function TimeframeFormDialog({
   isOpen,
@@ -23,16 +24,22 @@ export function TimeframeFormDialog({
   const isEditing = timeframe !== null;
   const isReferenced = isEditing && timeframe.referenced_cases_count > 0;
 
-  const [code, setCode] = useState('');
-  const [nameEn, setNameEn] = useState('');
-  const [nameAr, setNameAr] = useState('');
+  const [code, setCode] = useState("");
+  const [nameEn, setNameEn] = useState("");
+  const [nameAr, setNameAr] = useState("");
   const [minMonths, setMinMonths] = useState(0);
   const [isOpenEnded, setIsOpenEnded] = useState(false);
   const [maxMonths, setMaxMonths] = useState<number | null>(3);
   const [displayOrder, setDisplayOrder] = useState(1);
   const [localError, setLocalError] = useState<string | null>(null);
   const [errorField, setErrorField] = useState<
-    'code' | 'name_en' | 'name_ar' | 'min_months' | 'max_months' | 'range' | null
+    | "code"
+    | "name_en"
+    | "name_ar"
+    | "min_months"
+    | "max_months"
+    | "range"
+    | null
   >(null);
 
   useEffect(() => {
@@ -45,9 +52,9 @@ export function TimeframeFormDialog({
       setMaxMonths(timeframe.max_months);
       setDisplayOrder(timeframe.display_order);
     } else {
-      setCode('');
-      setNameEn('');
-      setNameAr('');
+      setCode("");
+      setNameEn("");
+      setNameAr("");
       setMinMonths(0);
       setIsOpenEnded(false);
       setMaxMonths(3);
@@ -65,41 +72,45 @@ export function TimeframeFormDialog({
     const trimmedEn = nameEn.trim();
     const trimmedAr = nameAr.trim();
     if (!trimmedEn) {
-      setLocalError('English label is required.');
-      setErrorField('name_en');
+      setLocalError("English label is required.");
+      setErrorField("name_en");
       return;
     }
     if (!trimmedAr) {
-      setLocalError('Arabic label is required.');
-      setErrorField('name_ar');
+      setLocalError("Arabic label is required.");
+      setErrorField("name_ar");
       return;
     }
 
     if (!isEditing) {
       const trimmedCode = code.trim();
       if (!trimmedCode || !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(trimmedCode)) {
-        setLocalError('Code must be lowercase alphanumeric with hyphens (e.g., 0-3-months).');
-        setErrorField('code');
+        setLocalError(
+          "Code must be lowercase alphanumeric with hyphens (e.g., 0-3-months).",
+        );
+        setErrorField("code");
         return;
       }
     }
 
     if (minMonths < 0) {
-      setLocalError('Minimum months must be 0 or greater.');
-      setErrorField('min_months');
+      setLocalError("Minimum months must be 0 or greater.");
+      setErrorField("min_months");
       return;
     }
 
     if (!isOpenEnded && (maxMonths === null || Number.isNaN(maxMonths))) {
-      setLocalError('Maximum months is required when not open-ended.');
-      setErrorField('max_months');
+      setLocalError("Maximum months is required when not open-ended.");
+      setErrorField("max_months");
       return;
     }
 
     const resolvedMax = isOpenEnded ? null : maxMonths;
     if (resolvedMax !== null && resolvedMax <= minMonths) {
-      setLocalError('Maximum months must be strictly greater than minimum months.');
-      setErrorField('range');
+      setLocalError(
+        "Maximum months must be strictly greater than minimum months.",
+      );
+      setErrorField("range");
       return;
     }
 
@@ -131,10 +142,11 @@ export function TimeframeFormDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            {isEditing ? 'Edit Timeframe Option' : 'Create Timeframe Option'}
+            {isEditing ? "Edit Timeframe Option" : "Create Timeframe Option"}
           </DialogTitle>
           <DialogDescription>
-            Configure clinical timeframe intervals for post-op photo categorization.
+            Configure clinical timeframe intervals for post-op photo
+            categorization.
           </DialogDescription>
         </DialogHeader>
 
@@ -150,8 +162,9 @@ export function TimeframeFormDialog({
 
         {isReferenced && (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-            Range boundaries are locked because this timeframe is referenced by{' '}
-            {timeframe.referenced_cases_count} gallery case(s). To modify the range, retire this option and create a replacement.
+            Range boundaries are locked because this timeframe is referenced by{" "}
+            {timeframe.referenced_cases_count} gallery case(s). To modify the
+            range, retire this option and create a replacement.
           </div>
         )}
 
@@ -165,12 +178,14 @@ export function TimeframeFormDialog({
               value={code}
               onChange={(e) => {
                 setCode(e.target.value);
-                if (errorField === 'code') setErrorField(null);
+                if (errorField === "code") setErrorField(null);
               }}
               placeholder="e.g. 18-24-months"
               className="font-mono"
-              aria-invalid={errorField === 'code' ? true : undefined}
-              aria-describedby={errorField === 'code' ? 'timeframe-error' : undefined}
+              aria-invalid={errorField === "code" ? true : undefined}
+              aria-describedby={
+                errorField === "code" ? "timeframe-error" : undefined
+              }
             />
           </div>
 
@@ -184,11 +199,13 @@ export function TimeframeFormDialog({
                 value={nameEn}
                 onChange={(e) => {
                   setNameEn(e.target.value);
-                  if (errorField === 'name_en') setErrorField(null);
+                  if (errorField === "name_en") setErrorField(null);
                 }}
                 placeholder="e.g. 18–24 Months"
-                aria-invalid={errorField === 'name_en' ? true : undefined}
-                aria-describedby={errorField === 'name_en' ? 'timeframe-error' : undefined}
+                aria-invalid={errorField === "name_en" ? true : undefined}
+                aria-describedby={
+                  errorField === "name_en" ? "timeframe-error" : undefined
+                }
               />
             </div>
 
@@ -202,12 +219,14 @@ export function TimeframeFormDialog({
                 value={nameAr}
                 onChange={(e) => {
                   setNameAr(e.target.value);
-                  if (errorField === 'name_ar') setErrorField(null);
+                  if (errorField === "name_ar") setErrorField(null);
                 }}
                 placeholder="e.g. ١٨-٢٤ شهراً"
                 className="font-arabic"
-                aria-invalid={errorField === 'name_ar' ? true : undefined}
-                aria-describedby={errorField === 'name_ar' ? 'timeframe-error' : undefined}
+                aria-invalid={errorField === "name_ar" ? true : undefined}
+                aria-describedby={
+                  errorField === "name_ar" ? "timeframe-error" : undefined
+                }
               />
             </div>
           </div>
@@ -229,14 +248,21 @@ export function TimeframeFormDialog({
                   disabled={isReferenced || isSubmitting}
                   value={minMonths}
                   onChange={(e) => {
-                    setMinMonths(Math.max(0, parseInt(e.target.value, 10) || 0));
-                    if (errorField === 'min_months' || errorField === 'range') setErrorField(null);
+                    setMinMonths(
+                      Math.max(0, parseInt(e.target.value, 10) || 0),
+                    );
+                    if (errorField === "min_months" || errorField === "range")
+                      setErrorField(null);
                   }}
                   className="font-mono"
-                  aria-invalid={errorField === 'min_months' || errorField === 'range' ? true : undefined}
+                  aria-invalid={
+                    errorField === "min_months" || errorField === "range"
+                      ? true
+                      : undefined
+                  }
                   aria-describedby={
-                    errorField === 'min_months' || errorField === 'range'
-                      ? 'timeframe-error'
+                    errorField === "min_months" || errorField === "range"
+                      ? "timeframe-error"
                       : undefined
                   }
                 />
@@ -251,28 +277,38 @@ export function TimeframeFormDialog({
                   type="number"
                   min={minMonths + 1}
                   disabled={isReferenced || isOpenEnded || isSubmitting}
-                  value={isOpenEnded ? '' : maxMonths ?? ''}
+                  value={isOpenEnded ? "" : (maxMonths ?? "")}
                   onChange={(e) => {
                     const parsed = parseInt(e.target.value, 10);
                     setMaxMonths(Number.isNaN(parsed) ? null : parsed);
-                    if (errorField === 'max_months' || errorField === 'range') setErrorField(null);
+                    if (errorField === "max_months" || errorField === "range")
+                      setErrorField(null);
                   }}
-                  placeholder={isOpenEnded ? '∞ (open-ended)' : 'e.g. 24'}
+                  placeholder={isOpenEnded ? "∞ (open-ended)" : "e.g. 24"}
                   className="font-mono"
-                  aria-invalid={errorField === 'max_months' || errorField === 'range' ? true : undefined}
+                  aria-invalid={
+                    errorField === "max_months" || errorField === "range"
+                      ? true
+                      : undefined
+                  }
                   aria-describedby={
-                    errorField === 'max_months' || errorField === 'range'
-                      ? 'timeframe-error'
+                    errorField === "max_months" || errorField === "range"
+                      ? "timeframe-error"
                       : undefined
                   }
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-2 pt-1">
-              <input
+            <div className="pt-1">
+              <Checkbox
                 id="tf-open-ended"
-                type="checkbox"
+                label={
+                  <>
+                    Open-ended upper boundary (e.g. &ldquo;12+ months&rdquo;
+                    [min, ∞))
+                  </>
+                }
                 disabled={isReferenced || isSubmitting}
                 checked={isOpenEnded}
                 onChange={(e) => {
@@ -280,11 +316,7 @@ export function TimeframeFormDialog({
                   if (e.target.checked) setMaxMonths(null);
                   else setMaxMonths(minMonths + 3);
                 }}
-                className="size-4 rounded border-input text-primary focus:ring-ring disabled:opacity-50"
               />
-              <Label htmlFor="tf-open-ended" className="text-xs font-normal">
-                Open-ended upper boundary (e.g. &ldquo;12+ months&rdquo; [min, ∞))
-              </Label>
             </div>
           </div>
 
@@ -295,7 +327,9 @@ export function TimeframeFormDialog({
               type="number"
               disabled={isSubmitting}
               value={displayOrder}
-              onChange={(e) => setDisplayOrder(parseInt(e.target.value, 10) || 1)}
+              onChange={(e) =>
+                setDisplayOrder(parseInt(e.target.value, 10) || 1)
+              }
               className="w-24 font-mono"
             />
           </div>
@@ -311,10 +345,10 @@ export function TimeframeFormDialog({
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting
-                ? 'Saving…'
+                ? "Saving…"
                 : isEditing
-                ? 'Update Timeframe'
-                : 'Create Draft Timeframe'}
+                  ? "Update Timeframe"
+                  : "Create Draft Timeframe"}
             </Button>
           </DialogFooter>
         </form>

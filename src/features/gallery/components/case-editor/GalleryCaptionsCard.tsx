@@ -1,6 +1,7 @@
 import type { GalleryCaptionsCardProps } from '../../types/gallery.case-editor.types';
 import { Card, CardTitle, CardDescription } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { FieldError } from '../GalleryFieldError';
 
@@ -51,14 +52,9 @@ export function GalleryCaptionsCard({ register, serverErrors, clientErrors }: Ga
                 clientError={clientErrors?.captions?.[lang]?.caption?.message}
               />
             </div>
-            <Label className="mt-4 flex items-start gap-3">
-              <input
-                type="checkbox"
-                {...register(`captions.${lang}.approved`)}
-                className="mt-1"
-              />
-              <span>{lang.toUpperCase()} description reviewed and approved</span>
-            </Label>
+            <div className="mt-4">
+              <Checkbox {...register(`captions.${lang}.approved`)} label={`${lang.toUpperCase()} description reviewed and approved`} />
+            </div>
             <FieldError
               name={`captions.${lang}.approval`}
               errors={serverErrors}

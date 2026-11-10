@@ -65,7 +65,7 @@ export function toEdit(form: GalleryEditorForm, item: GalleryCase): GalleryEdit 
       lang,
       alt_text: form.captions[lang].altText,
       caption: form.captions[lang].caption,
-      approval: form.captions[lang].approved ? 'approved' : 'draft',
+      approval: form.captions[lang].altText.trim() && form.captions[lang].approved ? 'approved' : 'draft',
     }));
   return {
     expected_revision: item.revision,

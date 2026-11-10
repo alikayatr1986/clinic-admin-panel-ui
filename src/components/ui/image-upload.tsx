@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { ImageUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from './button';
 import { Label } from './label';
@@ -6,144 +7,130 @@ import type { ImageUploadProps } from '@/types/image-upload.types';
 
 export const ImageUpload = React.forwardRef<HTMLInputElement, ImageUploadProps>(function ImageUpload(
   {
-    id = 'image-upload',
-    label = 'Image',
-    description = 'JPEG, PNG, or WebP supported.',
-    accept = 'image/jpeg,image/png,image/webp',
-    disabled = false,
-    file = null,
-    onFileChange,
-    previewUrl = null,
-    previewAlt = 'Uploaded image preview',
-    isUploading = false,
-    progress = 0,
-    onUpload,
-    uploadButtonText,
-    uploadButtonDisabled,
-    error = null,
-    onImageError,
-    className,
-    children,
+    id, label = 'Image', description = 'JPEG, PNG, or WebP supported.',
+    accept = 'image/jpeg,image/png,image/webp', disabled = false, file = null,
+    onFileChange, previewUrl = null, previewAlt = 'Uploaded image preview',
+    isUploading = false, progress = 0, onUpload, uploadButtonText,
+    uploadButtonDisabled, error = null, onImageError, className, children,
   },
   ref
 ) {
-  const [isDragging, setIsDragging] = React.useState(false);
+  const generatedId = React.useId();
+  const inputId = id ?? `image-upload-${generatedId}`;
   const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [fileError, setFileError] = React.useState('');
+  const [localPreview, setLocalPreview] = React.useState<string | null>(null);
+  const unavailable = disabled || isUploading;
 
-  const setRefs = React.useCallback(
-    (node: HTMLInputElement | null) => {
-      inputRef.current = node;
-      if (typeof ref === 'function') ref(node);
-      else if (ref) (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
-    },
-    [ref]
-  );
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (disabled || isUploading) return;
-    const dropped = e.dataTransfer.files?.[0];
-    if (dropped && dropped.type.startsWith('image/')) onFileChange(dropped);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onFileChange(e.target.files?.[0] ?? null);
-  };
-
-  const displayUrl = React.useMemo(() => {
-    if (file) return URL.createObjectURL(file);
-    return previewUrl;
-  }, [file, previewUrl]);
+  const setRefs = React.useCallback((node: HTMLInputElement | null) => {
+    inputRef.current = node;
+    if (typeof ref === 'function') ref(node);
+    else if (ref) ref.current = node;
+  }, [ref]);
 
   React.useEffect(() => {
-    return () => {
-      if (file && displayUrl?.startsWith('blob:')) URL.revokeObjectURL(displayUrl);
-    };
-  }, [file, displayUrl]);
+    if (!file) {
+      setLocalPreview(null);
+      if (inputRef.current) inputRef.current.value = '';
+      return;
+    }
+    if (typeof URL.createObjectURL !== 'function') return;
+    const url = URL.createObjectURL(file);
+    setLocalPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
+  function selectFile(selected: File | null) {
+    if (!selected) return;
+    const accepted = accept.split(',').some((entry) => {
+      const value = entry.trim().toLowerCase();
+      return value.startsWith('.') ? selected.name.toLowerCase().endsWith(value)
+        : value.endsWith('/*') ? selected.type.toLowerCase().startsWith(value.slice(0, -1))
+          : selected.type.toLowerCase() === value;
+    });
+    if (!accepted) {
+      setFileError(`Unsupported file type. ${description}`);
+      if (inputRef.current) inputRef.current.value = '';
+      onFileChange(null);
+      return;
+    }
+    setFileError('');
+    onFileChange(selected);
+  }
+
+  const displayUrl = file ? localPreview : previewUrl;
   return (
     <div className={cn('space-y-4', className)}>
-      <div className="flex items-center justify-between">
-        <Label htmlFor={id} className="text-sm font-medium">
-          {label}
-        </Label>
-        {file && (
-          <span className="text-xs text-muted-foreground">
-            {file.name} ({(file.size / 1024).toFixed(1)} KB)
-          </span>
-        )}
+      <div className="space-y-1">
+        <Label htmlFor={inputId} className="text-sm font-semibold">{label}</Label>
+        <p id={`${inputId}-description`} className="text-sm text-muted-foreground">{description}</p>
       </div>
-
       <div
-        onDragOver={(e) => { e.preventDefault(); if (!disabled && !isUploading) setIsDragging(true); }}
+        onClick={(event) => {
+          if (!unavailable && !(event.target as HTMLElement).closest('button, input, a')) inputRef.current?.click();
+        }}
+        onDragOver={(event) => { event.preventDefault(); if (!unavailable) setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
-        onDrop={handleDrop}
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click(); } }}
-        tabIndex={disabled || isUploading ? -1 : 0}
-        role="button"
-        aria-label={`Select ${label.toLowerCase()}`}
+        onDrop={(event) => {
+          event.preventDefault();
+          setIsDragging(false);
+          if (!unavailable) selectFile(event.dataTransfer.files[0] ?? null);
+        }}
         className={cn(
-          'relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-colors cursor-pointer',
-          isDragging ? 'border-primary bg-primary/5' : 'border-slate-300 hover:border-slate-400 bg-slate-50/50',
-          (disabled || isUploading) && 'pointer-events-none opacity-60'
+          'rounded-xl border-2 border-dashed p-4 transition-colors sm:p-6',
+          !unavailable && 'cursor-pointer',
+          isDragging ? 'border-primary bg-primary/5' : 'border-primary/60 bg-slate-50/70',
+          unavailable && 'opacity-60'
         )}
       >
         <input
-          id={id}
-          ref={setRefs}
-          type="file"
-          accept={accept}
-          disabled={disabled || isUploading}
-          onChange={handleFileChange}
+          id={inputId} ref={setRefs} type="file" accept={accept} disabled={unavailable}
+          onChange={(event) => selectFile(event.target.files?.[0] ?? null)}
+          tabIndex={-1} aria-invalid={Boolean(fileError || error)}
+          aria-describedby={`${inputId}-description${fileError || error ? ` ${inputId}-error` : ''}`}
           className="sr-only"
         />
-
-        {displayUrl && !error ? (
-          <div className="relative max-h-72 w-full overflow-hidden rounded-lg bg-slate-100">
-            <img
-              src={displayUrl}
-              alt={previewAlt}
-              onError={onImageError}
-              className="max-h-72 w-full object-contain"
-            />
+        {displayUrl ? (
+          <div className="relative overflow-hidden rounded-lg bg-slate-100">
+            <img src={displayUrl} alt={previewAlt} onError={onImageError} className="max-h-72 w-full object-contain" />
             {children}
           </div>
         ) : (
-          <div className="space-y-2 py-4">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
+          <div className="py-5 text-center">
+            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <ImageUp aria-hidden="true" className="size-6" />
             </div>
-            <p className="text-sm font-medium text-slate-700">
-              Click to browse or drag and drop image here
-            </p>
-            <p className="text-xs text-muted-foreground">{description}</p>
+            <p className="text-base font-semibold text-foreground">Choose an image to get started</p>
+            <p className="mt-1 text-sm text-muted-foreground">Drag and drop an image here, or browse your files.</p>
           </div>
         )}
+        {file && (
+          <p className="mt-3 break-all text-sm text-foreground">
+            <span className="font-medium">Selected: {file.name}</span> <span className="text-muted-foreground">({(file.size / 1024).toFixed(1)} KB)</span>
+          </p>
+        )}
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
+          <Button type="button" variant="outline" disabled={unavailable} onClick={() => inputRef.current?.click()}>
+            {displayUrl || file ? 'Change image' : 'Browse files'}
+          </Button>
+          {file && (
+            <Button type="button" variant="ghost" disabled={unavailable} onClick={() => { setFileError(''); onFileChange(null); }}>
+              Remove selection
+            </Button>
+          )}
+        </div>
       </div>
-
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-
+      {(fileError || error) && <p id={`${inputId}-error`} role="alert" className="text-sm text-destructive">{fileError || error}</p>}
       {isUploading && (
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Uploading image: {progress}%</span>
-          </div>
-          <progress id="upload-progress" max="100" value={progress} className="h-2 w-full rounded bg-slate-200" />
+        <div className="space-y-2" aria-live="polite">
+          <Label htmlFor={`${inputId}-progress`} className="text-sm">Uploading image: {progress}%</Label>
+          <progress id={`${inputId}-progress`} max="100" value={progress} className="h-2 w-full accent-primary" />
         </div>
       )}
-
       {onUpload && (
-        <Button
-          type="button"
-          variant="outline"
-          disabled={disabled || isUploading || uploadButtonDisabled}
-          onClick={onUpload}
-        >
-          {uploadButtonText ?? (isUploading ? `Uploading ${progress}%…` : 'Upload')}
+        <Button type="button" disabled={unavailable || uploadButtonDisabled} onClick={onUpload}>
+          {uploadButtonText ?? (isUploading ? `Uploading ${progress}%…` : 'Upload image')}
         </Button>
       )}
     </div>
@@ -151,4 +138,3 @@ export const ImageUpload = React.forwardRef<HTMLInputElement, ImageUploadProps>(
 });
 
 ImageUpload.displayName = 'ImageUpload';
-

@@ -3,7 +3,7 @@ import type { BlogGenerationJob, BlogLocale } from '../types/blogs.types';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 
@@ -61,15 +61,12 @@ export function BlogGenerationReview({
       <div className="space-y-4">
         {/* Title */}
         <div className="rounded-lg border border-slate-100 p-4 bg-slate-50">
-          <Label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={Boolean(selected.title)}
-              onChange={() => toggle('title')}
-              aria-label="Select title"
-            />
-            <span>Title</span>
-          </Label>
+          <Checkbox
+            label={<>Title</>}
+            checked={Boolean(selected.title)}
+            onChange={() => toggle('title')}
+            aria-label="Select title"
+          />
           <div className="mt-2 grid gap-3 sm:grid-cols-2 text-sm">
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">Current</p>
@@ -84,15 +81,12 @@ export function BlogGenerationReview({
 
         {/* Excerpt */}
         <div className="rounded-lg border border-slate-100 p-4 bg-slate-50">
-          <Label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={Boolean(selected.excerpt)}
-              onChange={() => toggle('excerpt')}
-              aria-label="Select excerpt"
-            />
-            <span>Excerpt</span>
-          </Label>
+          <Checkbox
+            label={<>Excerpt</>}
+            checked={Boolean(selected.excerpt)}
+            onChange={() => toggle('excerpt')}
+            aria-label="Select excerpt"
+          />
           <div className="mt-2 grid gap-3 sm:grid-cols-2 text-sm">
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">Current</p>
@@ -107,15 +101,12 @@ export function BlogGenerationReview({
 
         {/* Body */}
         <div className="rounded-lg border border-slate-100 p-4 bg-slate-50">
-          <Label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={Boolean(selected.body)}
-              onChange={() => toggle('body')}
-              aria-label="Select body"
-            />
-            <span>Body ({result.body.blocks.length} blocks generated)</span>
-          </Label>
+          <Checkbox
+            label={<>Body ({result.body.blocks.length} blocks generated)</>}
+            checked={Boolean(selected.body)}
+            onChange={() => toggle('body')}
+            aria-label="Select body"
+          />
           <div className="mt-2 text-sm">
             <div className="max-h-48 overflow-y-auto rounded border border-slate-200 bg-white p-3 space-y-2">
               {result.body.blocks.map((b, i) => (
@@ -130,15 +121,12 @@ export function BlogGenerationReview({
 
         {/* SEO Title */}
         <div className="rounded-lg border border-slate-100 p-4 bg-slate-50">
-          <Label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={Boolean(selected.seo_title)}
-              onChange={() => toggle('seo_title')}
-              aria-label="Select SEO title"
-            />
-            <span>SEO Title</span>
-          </Label>
+          <Checkbox
+            label={<>SEO Title</>}
+            checked={Boolean(selected.seo_title)}
+            onChange={() => toggle('seo_title')}
+            aria-label="Select SEO title"
+          />
           <div className="mt-2 grid gap-3 sm:grid-cols-2 text-sm">
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">Current</p>
@@ -153,15 +141,12 @@ export function BlogGenerationReview({
 
         {/* SEO Description */}
         <div className="rounded-lg border border-slate-100 p-4 bg-slate-50">
-          <Label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={Boolean(selected.seo_description)}
-              onChange={() => toggle('seo_description')}
-              aria-label="Select SEO description"
-            />
-            <span>SEO Description</span>
-          </Label>
+          <Checkbox
+            label={<>SEO Description</>}
+            checked={Boolean(selected.seo_description)}
+            onChange={() => toggle('seo_description')}
+            aria-label="Select SEO description"
+          />
           <div className="mt-2 grid gap-3 sm:grid-cols-2 text-sm">
             <div>
               <p className="text-xs font-semibold uppercase text-slate-500">Current</p>

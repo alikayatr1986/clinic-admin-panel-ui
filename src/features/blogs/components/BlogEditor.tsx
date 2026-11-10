@@ -1,3 +1,4 @@
+import { ImageUpload } from '@/components/ui/image-upload';
 import { toast } from 'sonner';
 import { useAdminNavigation } from '../../../lib/admin-navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -155,7 +156,6 @@ function BlogEditorContent({
     setCovers((previous) => ({ ...previous, [locale]: { ...previous[locale], ...patch } }));
   }
   const [progress, setProgress] = useState(0);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const dirty = useMemo(
     () => Boolean(forms && saved && JSON.stringify(forms) !== JSON.stringify(saved)) || Boolean(covers.en.file || covers.ar.file),
@@ -439,7 +439,6 @@ function BlogEditorContent({
       queryClient.setQueryData<BlogDetail>(blogKeys.detail(currentPost.id), (p) => p && { ...p, aggregate_revision: result.aggregate_revision });
       setForms((all) => all && { ...all, [locale]: { ...all[locale], coverMediaID: result.media_id } });
       setCovers((previous) => ({ ...previous, [locale]: { ...previous[locale], file: null } }));
-      if (fileRef.current && fileRef.current.dataset.locale === locale) fileRef.current.value = '';
       uploaded = true;
       toast.success('Cover uploaded.');
       setNotice('Cover uploaded. Save this locale draft to use it; other unsaved fields remain unsaved.');
@@ -1027,20 +1026,6 @@ function BlogEditorContent({
         <p className="mt-2 text-sm text-slate-600">Upload the image separately, then save this edition to use the uploaded cover.</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
-            <Label htmlFor="blog-field-cover">Image</Label>
-            <input
-              id="blog-field-cover"
-              key={locale}
-              ref={fileRef}
-              data-locale={locale}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => updateCover({ file: e.target.files?.[0] ?? null })}
-              className="mt-2 block max-w-full text-sm"
-            />
-            {file && <p className="mt-1 text-sm">Selected: {file.name}</p>}
-          </div>
-          <div>
             <Label htmlFor="blog-field-rights">Rights/source record</Label>
             <Input
               id="blog-field-rights"
@@ -1075,14 +1060,23 @@ function BlogEditorContent({
               className="mt-2 w-full cursor-pointer accent-primary"
             />
           </div>
+          <div className="sm:col-span-2">
+            <ImageUpload
+              key={locale}
+              id="blog-field-cover"
+              label="Image"
+              file={file}
+              onFileChange={(selected) => updateCover({ file: selected })}
+              disabled={Boolean(busy) && busy !== 'upload'}
+              isUploading={busy === 'upload'}
+              progress={progress}
+              onUpload={() => void upload()}
+              uploadButtonText={busy === 'upload' ? `Uploading ${progress}%…` : 'Upload cover'}
+              uploadButtonDisabled={!fresh || !file || !rights.trim()}
+            />
+          </div>
         </div>
-        <Button
-          disabled={!fresh || Boolean(busy) || !file || !rights.trim()}
-          onClick={() => void upload()}
-          className="mt-4"
-        >
-          {busy === 'upload' ? `Uploading ${progress}%…` : 'Upload cover'}
-        </Button>
+
       </Card>
     </div>
   );

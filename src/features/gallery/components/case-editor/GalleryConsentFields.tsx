@@ -1,6 +1,7 @@
 import { Controller } from 'react-hook-form';
 import type { GalleryConsentFieldsProps } from '../../types/gallery.case-editor.types';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { FieldError } from '../GalleryFieldError';
 
@@ -38,14 +39,9 @@ export function GalleryConsentFields({
           clientError={clientErrors?.signedConsentID?.message}
         />
       </div>
-      <Label className="flex items-start gap-3 sm:col-span-2">
-        <input
-          type="checkbox"
-          {...register('consentVerified')}
-          className="mt-1"
-        />
-        <span>I verified this reference against the clinic-held signed permission.</span>
-      </Label>
+      <div className="sm:col-span-2">
+        <Checkbox {...register('consentVerified')} label="I verified this reference against the clinic-held signed permission." />
+      </div>
       <FieldError
         name="consent_verified"
         errors={serverErrors}

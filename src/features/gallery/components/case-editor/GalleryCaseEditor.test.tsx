@@ -92,6 +92,18 @@ describe('gallery case editor', () => {
     }));
   });
 
+  it('saves a cleared existing description as a removal', async () => {
+    const item = { ...readyCase, captions: [{ lang: 'en' as const, alt_text: 'Existing description', caption: '', approval: 'approved' as const }] };
+    setup(item);
+    const edit = vi.spyOn(galleryApi, 'edit').mockResolvedValue({ data: { ...item, revision: 5, captions: [] } });
+    const user = userEvent.setup();
+    await user.clear(await screen.findByLabelText('EN image description'));
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(edit).toHaveBeenCalledWith('case-1', expect.objectContaining({
+      captions: [{ lang: 'en', alt_text: '', caption: '', approval: 'draft' }],
+    })));
+  });
+
   it('reflects server approval resets and allows a second review save', async () => {
     setup({ ...readyCase, captions: readyCase.captions.map((caption) => ({ ...caption, approval: 'draft' })) });
     const edit = vi.spyOn(galleryApi, 'edit').mockResolvedValueOnce({ data: { ...readyCase, revision: 5, captions: readyCase.captions.map((caption) => ({ ...caption, approval: 'draft' })) } })

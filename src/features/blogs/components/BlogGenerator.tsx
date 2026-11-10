@@ -4,6 +4,7 @@ import { BlogGenerationReview } from "./BlogGenerationReview";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -299,19 +300,13 @@ export function BlogGenerator(props: BlogGeneratorProps) {
 
           {/* Privacy confirmation */}
           <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-            <Label className="flex items-start gap-2.5 cursor-pointer text-xs font-normal">
-              <input
-                type="checkbox"
-                checked={confirmedNoPatientData}
-                onChange={(e) => setConfirmedNoPatientData(e.target.checked)}
-                className="mt-0.5"
-              />
-              <span>
-                <strong>No patient data:</strong> I confirm this brief contains
+            <Checkbox
+              checked={confirmedNoPatientData}
+              onChange={(e) => setConfirmedNoPatientData(e.target.checked)}
+              label={<><strong>No patient data:</strong> I confirm this brief contains
                 no patient records, clinical photographs, personal contact
-                details, or private consultation transcripts.
-              </span>
-            </Label>
+                details, or private consultation transcripts.</>}
+            />
             {fieldErrors.confirmation && (
               <p className="mt-1 text-xs text-rose-600">
                 {fieldErrors.confirmation}

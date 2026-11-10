@@ -10,6 +10,7 @@ import {
   useUnpublishBlogPost,
 } from '../hooks/useBlogMutations';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
@@ -313,18 +314,12 @@ export function BlogPublishPanel({
             <legend className="font-medium text-sm">
               Attest {LOCALE_NAME[review.locale]} reviews · revision {post[review.locale]?.edition_revision}
             </legend>
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={attested}
-                onChange={(e) => setAttested(e.target.checked)}
-                className="mt-0.5 rounded border-slate-300"
-              />
-              <span>
-                I confirm these reviews were completed for this exact saved revision and category:{' '}
-                {pending.map((kind) => REVIEW_LABEL[kind]).join(', ')}.
-              </span>
-            </label>
+            <Checkbox
+              checked={attested}
+              onChange={(e) => setAttested(e.target.checked)}
+              label={<>I confirm these reviews were completed for this exact saved revision and category:{' '}
+                {pending.map((kind) => REVIEW_LABEL[kind]).join(', ')}.</>}
+            />
             <div>
               <Label htmlFor="review-reference">Private review reference (optional)</Label>
               <Input
